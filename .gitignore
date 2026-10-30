@@ -1,0 +1,7 @@
+__pycache__/
+.pytest_cache/
+*.egg-info/
+.venv/
+# Publisher PDF: keep a local copy, do not redistribute
+*.pdf
+*.skill

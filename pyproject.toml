@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mikulasek-eb"
+version = "0.1.0"
+description = "Phenomenological eclipsing-binary light-curve model and eclipse timing (independent implementation of Mikulasek 2015, A&A 584, A8)"
+requires-python = ">=3.10"
+dependencies = ["numpy", "scipy", "astropy"]
+
+[project.optional-dependencies]
+plot = ["matplotlib"]
+tess = ["volightcurve"]
+test = ["pytest"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src", "working_scripts"]
+testpaths = ["tests"]
