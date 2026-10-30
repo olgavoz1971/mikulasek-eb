@@ -1,6 +1,6 @@
 star: EK_Com
 VOTable period (start): 0.2666852 d; paper period: 0.26669
-median catalogue sigma: 1.07 mmag; out-of-eclipse noise floor: 22.13 mmag (inflated by orbital modulation in contact systems; compare rms in mmag)
+median catalogue sigma: 1.07 mmag; out-of-eclipse noise floor: 16.49 mmag (inflated by orbital modulation in contact systems; compare rms in mmag)
 variant A: rms 37.22 mmag, chi2 2722613, rchi2 1028.2, free parameters 1
 variant B: rms 8.50 mmag, chi2 132567, rchi2 50.2, free parameters 7
 variant C: rms 7.47 mmag, chi2 105770, rchi2 40.1, free parameters 9

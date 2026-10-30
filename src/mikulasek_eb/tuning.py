@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 
 import numpy as np
+from scipy.signal import find_peaks
 
 from .fitting import _Nuisance, fit_global
 from .timing import fit_ephemeris, virtual_minima
@@ -78,7 +79,8 @@ def initial_guess(t, mag, P, nb=200):
         nb (int): Number of phase bins.
 
     Returns:
-        dict: M0 (days, near mid-data), A1 and A2 (mag, relative to the median level) and
+        dict: M0 (days, near mid-data), A1 and A2 (mag, depths below the local continuum; A2 is that of the most
+        prominent flux minimum within 0.2 cycles of phase 0.5) and
         fwhm of the primary (cycles).
     """
     t = np.asarray(t)
@@ -90,9 +92,27 @@ def initial_guess(t, mag, P, nb=200):
     )
     c = np.where(np.isnan(c), np.nanmedian(c), c)
     ip = int(np.argmax(c))
-    lev = np.median(c)
+    # Depths are measured below the local continuum: the mean of the brightest binned
+    # values 0.03 to 0.25 cycles on each side of the eclipse (as in ``features``). A
+    # global median level fails when the out-of-eclipse variation is strong.
+    off = np.arange(max(1, int(round(0.03 * nb))), int(round(0.25 * nb)) + 1)
+
+    def shoulders(i):
+        """Mean of the brightest binned values on both sides of bin ``i``."""
+        return 0.5 * (c[(i - off) % nb].min() + c[(i + off) % nb].min())
+
+    lev = shoulders(ip)
     A1 = c[ip] - lev
-    A2 = c[(ip + nb // 2) % nb] - lev
+    # secondary: the most prominent flux minimum within 0.2 cycles of phase 0.5
+    half = int(round(0.2 * nb))
+    centre = (ip + nb // 2) % nb
+    idx = (centre + np.arange(-half, half + 1)) % nb
+    pk, props = find_peaks(c[idx], prominence=0.0)
+    if len(pk):
+        i2 = int(idx[pk[int(np.argmax(props["prominences"]))]])
+    else:
+        i2 = centre  # no local minimum: depth at phase 0.5 itself (not an eclipse)
+    A2 = c[i2] - shoulders(i2)
     n = 1
     while n < nb // 2 and c[(ip - n) % nb] > lev + A1 / 2:
         n += 1

@@ -94,6 +94,8 @@ from .errors import (
 )
 from .solution import ModelSolution
 from .features import Features, FeatureSettings, extract_features
+from .candidates import Candidate, RuleSettings, propose_candidates, review_features
+from .selection import CandidateRow, SelectionResult, select_model
 from .borrow import GROUPS, ParameterPlan, fit_borrowed
 from .config import (
     Config,
@@ -117,6 +119,13 @@ from .io import load_tess_votable
 from .helpers import absolute_jd_to_mjd
 
 __all__ = [
+    "Candidate",
+    "RuleSettings",
+    "propose_candidates",
+    "review_features",
+    "CandidateRow",
+    "SelectionResult",
+    "select_model",
     "Features",
     "FeatureSettings",
     "extract_features",

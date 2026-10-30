@@ -128,3 +128,7 @@ Reason for doing this first: the paper comparison must rest on an engine that do
 - 2026-10-30: features implemented and run on all seven light curves.
 - 2026-10-30: eclipse windows now edge-based; contact indicator replaced by separated_eclipses plus contact_candidate.
 - 2026-10-30: local-continuum depth, secondary peak search, trend diagnostics (red-noise ratio, correlation time, gap steps) in features.
+
+## Phase 4: hypothesis rules and evidence stage (done)
+- `candidates.py`, `selection.py`, tests in `tests/test_selection.py`, spec section 11.
+- Open: n_eff for stars with no measurable correlation time (AR Aur); threshold calibration on more stars; script saving the selection summary.

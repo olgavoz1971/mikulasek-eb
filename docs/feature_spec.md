@@ -173,3 +173,26 @@ In TESS data the slow structure is mostly instrumental, so the features only des
 - `gap_steps`: for every gap longer than `gap_days`, the difference of the residual medians over `step_window_days` (whole cycles) after and before the gap, with its error. The unit tests recover an injected 6 mmag step.
 - Observation: V477 Lyr has a step of 9.8 +- 2.0 mmag at its gap (instrumental); the other stars show steps of 0 to 2.5 mmag.
 - The baseline order itself will be decided in the evidence stage with `n_effective` (section 5), not here.
+
+## 11. Hypothesis rules and the evidence stage
+
+Rules (`candidates.py`) turn the features into a short list of candidate
+configurations, each with written reasons. They never fit anything.
+
+- Harmonics: a contact candidate gives (1, 2, 3) and (2, 3); continuous
+  variation with unequal depths gives (1, 2, 3) and (2,); separated eclipses
+  give the significant harmonics only.
+- Baseline order 0 and 1 are both tried. `ocon` is added when the maxima
+  differ significantly (> 3 sigma).
+- Exposure integration is switched on when exposure / FWHM > 0.1.
+- A gap split is added when the features found gaps.
+- `review_features` lists reasons to ask a human (for example a possible
+  double period from odd/even differences); these are never silently resolved.
+
+Evidence (`selection.py`): every candidate is fitted by the staged pipeline and
+compared on the common set of points with a residual-based sigma,
+BIC = n_eff ln(rss/n) + k ln(n_eff), where n_eff = span / correlation time.
+A failed candidate stays in the table with its error. The answer is flagged
+`ask_human` when the best two differ by BIC < 10, when any candidate failed,
+when the review raised reasons, or when n_eff could not be measured (then the
+evidence is overstated). Thresholds are placeholders until more stars exist.
