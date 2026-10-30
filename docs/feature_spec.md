@@ -1,6 +1,6 @@
 # Light-curve features for automatic model selection (draft for review)
 
-Status: DRAFT 2026-10-30, not implemented. Nothing here is validated; thresholds are placeholders to be set from the test stars and labelled as our heuristics.
+Status: first implementation 2026-10-30 (`src/mikulasek_eb/features.py`, `FeatureSettings` holds every window and threshold). Nothing here is validated; thresholds are placeholders to be set from the test stars and labelled as our heuristics. See section 8 for the first results and for where the implementation differs from this text.
 
 ## 1. Purpose and rules
 
@@ -121,3 +121,21 @@ Development and test split: thresholds are set on AA And, EK Com and two of the 
 1. Window sizes (1.5 FWHM for the eclipse windows, 0.10 to 0.20 for the local reference) are my choice. Are they acceptable?
 2. Is 200 phase bins right for 10-min data (2932 points, about 70 cycles, so about 15 points per bin)? For 30-min data about 6 per bin.
 3. Do you want the features also to be written into the header of the timing files?
+
+## 8. First implementation (2026-10-30)
+
+Differences from the draft above:
+- **Reference level.** Depths are measured from the mean of the median fold at the two quadratures (0.25 and 0.75, window plus or minus 0.05), not from a window 0.10 to 0.20 cycles away. Harmonic terms therefore count in the depth (tested on a synthetic star).
+- **Noise.** `sigma_noise_mag` is the robust consecutive-difference noise of the residuals about the fold, not of the raw curve, so eclipses do not inflate it.
+- **Bins.** `n_bins=None` means `min(1000, max(100, n_points // 10))`. With 200 bins the narrow AR Aur eclipse had 3 bins in its core.
+- **Drift (E2).** Eclipse centre = vertex of a parabola on the bottom core in each half; reported with the implied period correction. For flat-bottom eclipses the error is large (honest). Parity (E1) is the even/odd median magnitude within 0.25 FWHM of each eclipse.
+- **Missing values.** Unmeasurable features are `None` plus a note in `Features.notes`. An irregular cadence gives `None` for cadence and exposure instead of an exception.
+- **Timing headers.** `write_timing_ascii(features=...)` writes `# features:` (one-line JSON) and `# features_hash:`. The EK Com script does this and also saves `results/ek_com_s49_features.json`.
+- **Not implemented yet:** the lookup `gamma_estimate` assumes profile 1 with C = 0 (the match distance is reported); the hypothesis rules (section 4) and the evidence stage (section 5).
+
+First results (`examples/features_table.py`, `results/features_summary.md`), to be read as observations, not as validation:
+- The contact indicator (`eclipse coverage` above 0.9 or FWHM above 0.2) says contact for AA And, whose eclipses are wide (FWHM 0.14, 1.5 FWHM windows cover 93 percent of the cycle) but which has real flat maxima (out-of-eclipse amplitude 3 percent of the depth). The windows are too generous or the indicator should use `ooe_amplitude_over_depth`. To be settled on the data.
+- `trend_order_hint` is 3 (the maximum) for every star, so it carries no information yet; the residuals about the fold contain structure that the BIC always wants to absorb.
+- `gamma_estimate` for the two-component AA And profile does not match profile 1 (distance 0.26), which is the expected warning.
+- XY Boo S50: both eclipses are measured; primary centre moves by -51 +- 12 s between the two halves of the sector while the secondary moves by +9 +- 12 s. Opposite behaviour of the two minima is the signature of spots, not of a period change; a period change would move both the same way. This is an observation, not a conclusion. The 10-min data can detect shifts of about 10 s at one sigma.
+- Questions 1 and 2 of section 7 stay open and are now `FeatureSettings` fields.

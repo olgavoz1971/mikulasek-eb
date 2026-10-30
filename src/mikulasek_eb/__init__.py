@@ -93,6 +93,7 @@ from .errors import (
     NoValidSolution,
 )
 from .solution import ModelSolution
+from .features import Features, FeatureSettings, extract_features
 from .borrow import GROUPS, ParameterPlan, fit_borrowed
 from .config import (
     Config,
@@ -116,6 +117,9 @@ from .io import load_tess_votable
 from .helpers import absolute_jd_to_mjd
 
 __all__ = [
+    "Features",
+    "FeatureSettings",
+    "extract_features",
     "GROUPS",
     "ParameterPlan",
     "fit_borrowed",

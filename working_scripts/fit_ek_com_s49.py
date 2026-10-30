@@ -45,6 +45,7 @@ _ROOT = Path(__file__).resolve().parent.parent
 from mikulasek_eb.helpers import absolute_jd_to_mjd, predicted_magnitude
 from mikulasek_eb.io import load_tess_votable
 from mikulasek_eb.api import solution_from_pipeline
+from mikulasek_eb.features import extract_features
 from mikulasek_eb.pipeline import FitConfig, run_staged_fit
 from mikulasek_eb.plotting import plot_global_fit
 from mikulasek_eb.tom import (
@@ -150,7 +151,10 @@ def main() -> None:
         "fit_time_system: MJD (ToM converted back to JD)",
         "two_component_primary: rejected (shape checks)",
     ]
+    features = extract_features(t_mjd_full, mag, sig, period, epoch_jd)
+    (RESULTS_DIR / f"{TIMING_STEM}_features.json").write_text(features.to_json())
     ascii_kw = dict(
+        features=features,
         lightcurve=VOTABLE_PATH,
         period=period,
         t0_jd=epoch_jd,

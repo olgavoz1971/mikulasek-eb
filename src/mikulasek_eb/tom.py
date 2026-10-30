@@ -408,6 +408,7 @@ def write_timing_ascii(
     ),
     rejected: list | None = None,
     recipe: TimingRecipe | None = None,
+    features=None,
 ) -> None:
     """Write times of minima as two-column ASCII (JD, error in days).
 
@@ -427,6 +428,8 @@ def write_timing_ascii(
             ``time_both_walls``); written to the header with their reason.
         recipe (TimingRecipe | None): Recipe used; its JSON and hash go to the header and
             its baseline order replaces the default one.
+        features (Features | None): Measured light-curve features; their JSON and hash go
+            to the header.
     """
     if not has_timings(vm):
         logger.warning("skip %s: no timings to write", path)
@@ -462,6 +465,9 @@ def write_timing_ascii(
         lines.append(
             f"# timing_recipe_hash: {hashlib.sha256(recipe_json.encode()).hexdigest()[:12]}"
         )
+    if features is not None:
+        lines.append(f"# features: {features.to_json(indent=None)}")
+        lines.append(f"# features_hash: {features.features_hash()}")
     if rejected is not None:
         reasons = sorted({row["reason"] for row in rejected})
         counts = ", ".join(
