@@ -92,6 +92,7 @@ def plot_global_fit(
     title: str,
     timescale: str | None = None,
     save_path: str | None = None,
+    note: str | None = None,
 ) -> None:
     """Plot time series, fold, primary zoom, and residuals (matplotlib).
 
@@ -111,6 +112,8 @@ def plot_global_fit(
         title (str): Figure title.
         timescale (str, optional): TIMESYS timescale for the axis label.
         save_path (str, optional): If set, also save the figure to this path.
+        note (str, optional): Figure subtitle; the default describes single- or
+            two-component templates.
     """
     phi = theta - np.round(theta)
     phi_grid = np.linspace(FOLD_PHASE_MIN, FOLD_PHASE_MAX, FOLD_PHASE_GRID_N)
@@ -245,11 +248,12 @@ def plot_global_fit(
     ax.set_xlim(FOLD_PHASE_MIN, FOLD_PHASE_MAX)
     ax.set_ylabel("Residual (mmag)")
     ax.legend()
-    note = (
-        "Two-component primary: extension, not Mikulasek (2015)."
-        if not same
-        else "Single-component template."
-    )
+    if note is None:
+        note = (
+            "Two-component primary: extension, not Mikulasek (2015)."
+            if not same
+            else "Single-component template."
+        )
     fig.suptitle(note, y=0.995)
     plt.tight_layout()
     if save_path:

@@ -1,0 +1,121 @@
+{
+  "schema_version": 1,
+  "config": {
+    "schema_version": 1,
+    "model": {
+      "profile": 1,
+      "harmonics": [
+        1,
+        2,
+        3
+      ],
+      "ocon": true,
+      "kterm": false
+    },
+    "data": {
+      "baseline_order": 3,
+      "gap_split_days": 0.5,
+      "exposure_days": 0.020833654329180717,
+      "exposure_nsub": null
+    },
+    "policy": {
+      "gamma_starts": [
+        0.5,
+        1,
+        2,
+        4,
+        8
+      ],
+      "separate_shape_chi2_frac": 0.01,
+      "clip_nsig": 5.0,
+      "allow_two_component": true,
+      "rms_noise_two_comp_threshold": 1.5,
+      "eclipse_weight": 1.0,
+      "eclipse_phase_half": 0.12,
+      "min_points_per_fwhm": 8.0,
+      "primary_a2_over_a1_min_ratio": 1.2,
+      "two_comp_min_rms_gain_frac": 0.25,
+      "two_comp_min_agreeing_starts": 2,
+      "two_comp_max_rel_err": 0.5,
+      "two_comp_eclipses": [
+        1
+      ],
+      "two_comp_timing_agreement_sigma_max": 1.0
+    },
+    "timing": {
+      "window": 0.25,
+      "baseline_order": 1,
+      "max_sigma_factor": 5.0,
+      "require_contact_walls": true,
+      "clip_outliers": true,
+      "local_windows": [
+        0.15,
+        0.1,
+        0.06
+      ],
+      "template": "own"
+    },
+    "notes": ""
+  },
+  "params": {
+    "A1": 0.13201853456559462,
+    "A2": 0.09578027207871793,
+    "D1": 0.02733247413368329,
+    "G1": 3.025248559776356,
+    "C1": 0.0,
+    "D2": 0.05526763085339898,
+    "G2": 1.8558284049680227,
+    "C2": 0.0,
+    "H1": 0.038416428545042555,
+    "H2": 0.044821439242633765,
+    "H3": 0.004600439552709083,
+    "S1": 0.0010823801369027946,
+    "A1b": 0.28725652178879485,
+    "D1b": 0.05206941356245805,
+    "G1b": 1.8595809682267797
+  },
+  "errors": {
+    "A1": 0.0005345516593402854,
+    "A2": 0.000585259025421954,
+    "H1": 0.0003094831973598847,
+    "H2": 0.00015018054080972567,
+    "H3": 0.00019922280927291613,
+    "S1": 7.118730716283063e-05,
+    "A1b": 0.0008078611860916539,
+    "M0": 0.00013805227697487806
+  },
+  "ephemeris": {
+    "M0": 58750.41382045426,
+    "P0": 0.9350874865949389,
+    "Pdot": 0.0
+  },
+  "stats": {
+    "chi2": 9269.949783035392,
+    "dof": 1100,
+    "rchi2": 8.42722707548672,
+    "rms_mag": 0.001679725498081012,
+    "n_points": 1116,
+    "n_input": 1116,
+    "n_clipped": 0,
+    "rank_deficient": false,
+    "two_component": true
+  },
+  "exposure": {
+    "days": 0.020833654329180717,
+    "nsub": 5
+  },
+  "provenance": {
+    "data_id": "TESS_SPOC_sector_16",
+    "epoch_jd": 2452500.73,
+    "period_input_days": 0.9350969,
+    "package_version": "0.1.0",
+    "borrowed_from": "5e4ee9906608",
+    "plan": {
+      "free": [
+        "amplitudes",
+        "harmonics",
+        "zero_phase"
+      ]
+    }
+  }
+}
