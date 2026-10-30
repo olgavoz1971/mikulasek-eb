@@ -35,6 +35,15 @@ pytest
 
 Without installing, `PYTHONPATH=src` works for the scripts; pytest uses `pythonpath` from `pyproject.toml`.
 
+## Scope of the automatic selector
+
+The feature extraction, hypothesis rules and evidence stage (`select_model`)
+are designed and calibrated for **TESS light curves only** (cadences of 2, 10
+and 30 minutes, TESS noise and systematics). They are not expected to work on
+other surveys such as Gaia, and must not be used there without a new
+calibration. The fitting engine and the timing code do not have this
+restriction.
+
 ## Status
 
 Early development. See `todo.md` for the plan and progress log.

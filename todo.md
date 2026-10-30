@@ -132,3 +132,8 @@ Reason for doing this first: the paper comparison must rest on an engine that do
 ## Phase 4: hypothesis rules and evidence stage (done)
 - `candidates.py`, `selection.py`, tests in `tests/test_selection.py`, spec section 11.
 - Open: n_eff for stars with no measurable correlation time (AR Aur); threshold calibration on more stars; (script `examples/select_models.py` done; accepts any .vot path).
+
+## Calibration plan
+- Selector is TESS-only (documented in README, spec section 12, notes section 9).
+- Precise calibration: PHOEBE synthetic set with TESS cadence/gaps/noise (data to come).
+- Meanwhile: supervised per-star analysis (run tools, judge by residual numbers and plots).

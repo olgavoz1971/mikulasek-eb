@@ -196,3 +196,21 @@ A failed candidate stays in the table with its error. The answer is flagged
 `ask_human` when the best two differ by BIC < 10, when any candidate failed,
 when the review raised reasons, or when n_eff could not be measured (then the
 evidence is overstated). Thresholds are placeholders until more stars exist.
+
+## 12. Scope and calibration plan
+
+**Scope.** Sections 1 to 11 are valid for TESS data only. The thresholds
+(edge level, contact indicator, equal-depth ratio, ΔBIC, exposure switch) were
+set on TESS light curves and depend on TESS cadence, noise and systematics.
+The selector is not expected to work on Gaia or ground-based data without a new
+calibration.
+
+**Ground truth.** The ground truth for calibration is not a human choice of
+profile and harmonics but how closely the fit follows the observations. Precise
+calibration will use synthetic light curves computed with PHOEBE and sampled
+with the cadence, gaps and noise of real TESS data, so that the true geometry
+is known. Until then the thresholds are placeholders.
+
+**Interim work.** Stars are analysed one by one in a supervised mode: the
+existing tools are run, the chosen fits are judged by the residual numbers and
+by plots, and rules are changed only when the evidence supports it.

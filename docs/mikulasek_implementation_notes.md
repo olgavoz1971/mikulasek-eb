@@ -219,3 +219,10 @@ K gives little in this idealised test.
 **Not done yet (planned).**
 - Staged pipeline with some parameters fixed (not needed for borrowing, which uses `fit_global` directly).
 - A joint ephemeris over several sectors.
+
+## 9. Scope of the automatic selector (2026-10-30)
+
+The selector (features, rules, evidence stage) applies to TESS data only; it
+is not expected to work on Gaia. Calibration will use PHOEBE synthetic light
+curves with TESS cadence and noise; ground truth is the fit quality, not a
+visual choice of profile. See `feature_spec.md`, section 12.
