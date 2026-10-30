@@ -94,6 +94,7 @@ Reason for doing this first: the paper comparison must rest on an engine that do
 - Use cases to keep in mind: host application on a remote server (stateless, cacheable, JSON), local scripts, Jupyter notebooks, analysis with an agent; not only TESS data.
 
 ### Phase 4: automatic profile selection
+- [x] Feature spec drafted: `docs/feature_spec.md` (features A to F, draft rules, evidence stage, test stars incl. XY Boo S50). Awaiting developer review before code.
 - [ ] Light-curve analysis features from the fold (depths, widths, flatness, out-of-eclipse curvature, reflection effect, secondary phase check).
 - [ ] Hypothesis tree: detached, contact, semi-detached, reflection, eccentric flag.
 - [ ] Model choice by an explicit criterion (BIC or similar on honest uncertainties), not ad hoc thresholds.
@@ -122,3 +123,4 @@ Reason for doing this first: the paper comparison must rest on an engine that do
 - 2026-10-30: Phase 3c step 2 done (`ModelSolution`, `fit`, `time`, typed errors, progress hook). Next: step 3 (`ParameterPlan`, borrowing), then Phase 4.
 - 2026-10-30: Phase 3c step 3 core done (borrowing tested on three AA And light curves).
 - 2026-10-30: per-star scripts save config and solution JSON. Sector 17 handling and joint ephemeris postponed by the developer. Next: Phase 4 discussion.
+- 2026-10-30: XY Boo (TIC 347405567, S50, 10-min) added to `data/`; feature spec drafted.
