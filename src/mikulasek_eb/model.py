@@ -21,45 +21,52 @@ def _one_minus_pow(u, G):
         return -np.expm1(G * np.log1p(-u))
 
 
-def prof1(phi, D, G, C=0.0):  # Eq. (13) / Table 2 #1
-    """Normalised eclipse profile: Eq. (13) / Table 2 profile 1 with curvature term C.
+def prof1(phi, D, G, C=0.0, K=0.0):  # Eq. (13) / Table 2 #1, Eq. (14) with K
+    """Normalised eclipse profile: Eq. (13) / Table 2 profile 1, optionally Eq. (14).
+
+    F = (1 + C x^2 + K x^4) {1 - [1 - exp(1 - cosh x)]^G}, x = phi / D. The quartic
+    term K is the paper's extra parameter for very precise transit data (Eq. 14); K = 0
+    gives Eq. (13).
 
     Args:
         phi (ndarray): Phase offset from the eclipse centre (cycles).
         D (float): Width parameter (cycles).
         G (float): Kurtosis Gamma (dimensionless).
         C (float): Curvature of the bottom (dimensionless).
+        K (float): Quartic correction of the bottom (dimensionless).
 
     Returns:
         ndarray: Profile, 1 at the centre and 0 far from it (multiply by A in mag).
     """
     x = np.clip(phi / D, -60.0, 60.0)
-    return (1.0 + C * x**2) * _one_minus_pow(np.exp(1.0 - np.cosh(x)), G)
+    return (1.0 + C * x**2 + K * x**4) * _one_minus_pow(np.exp(1.0 - np.cosh(x)), G)
 
 
-def prof2(phi, D, G, C=0.0):  # Table 2 #2 (no C)
+def prof2(phi, D, G, C=0.0, K=0.0):  # Table 2 #2 (no C)
     """Normalised eclipse profile: Table 2 profile 2 (the curvature C is ignored).
 
     Args:
         phi (ndarray): Phase offset from the eclipse centre (cycles).
         D (float): Width parameter (cycles).
         G (float): Kurtosis Gamma (dimensionless).
-        C (float): Curvature of the bottom (dimensionless).
+        C (float): Ignored (profile has no C).
+        K (float): Ignored (profile has no K).
 
     Returns:
         ndarray: Profile, 1 at the centre and 0 far from it (multiply by A in mag).
     """
-    return prof1(phi, D, G, 0.0)
+    return prof1(phi, D, G, 0.0, 0.0)
 
 
-def prof3(phi, D, G, C=0.0):  # Table 2 #3
+def prof3(phi, D, G, C=0.0, K=0.0):  # Table 2 #3
     """Normalised eclipse profile: Table 2 profile 3 (Gaussian-based; the curvature C is ignored).
 
     Args:
         phi (ndarray): Phase offset from the eclipse centre (cycles).
         D (float): Width parameter (cycles).
         G (float): Kurtosis Gamma (dimensionless).
-        C (float): Curvature of the bottom (dimensionless).
+        C (float): Ignored (profile has no C).
+        K (float): Ignored (profile has no K).
 
     Returns:
         ndarray: Profile, 1 at the centre and 0 far from it (multiply by A in mag).
@@ -68,14 +75,15 @@ def prof3(phi, D, G, C=0.0):  # Table 2 #3
     return _one_minus_pow(np.exp(-0.5 * x**2), G)
 
 
-def prof4(phi, D, G, C=0.0):  # Table 2 #4: Re[(1-|x|^G)^(3/2)]
+def prof4(phi, D, G, C=0.0, K=0.0):  # Table 2 #4: Re[(1-|x|^G)^(3/2)]
     """Normalised eclipse profile: Table 2 profile 4, Re[(1 - |x|^G)^(3/2)] (Andronov type; C is ignored).
 
     Args:
         phi (ndarray): Phase offset from the eclipse centre (cycles).
         D (float): Width parameter (cycles).
         G (float): Kurtosis Gamma (dimensionless).
-        C (float): Curvature of the bottom (dimensionless).
+        C (float): Ignored (profile has no C).
+        K (float): Ignored (profile has no K).
 
     Returns:
         ndarray: Profile, 1 at the centre and 0 far from it (multiply by A in mag).
@@ -84,7 +92,72 @@ def prof4(phi, D, G, C=0.0):  # Table 2 #4: Re[(1-|x|^G)^(3/2)]
     return np.where(base > 0.0, np.abs(base) ** 1.5, 0.0)
 
 
-PROFILES = {1: prof1, 2: prof2, 3: prof3, 4: prof4}
+def prof5(phi, D, G=None, C=0.0, K=0.0):  # Table 2 #5
+    """Normalised eclipse profile: Table 2 profile 5, exp(-x^2 / 2), x = phi / D.
+
+    Args:
+        phi (ndarray): Phase offset from the eclipse centre (cycles).
+        D (float): Width parameter (cycles).
+        G (float): Ignored (profile has no Gamma).
+        C (float): Ignored (profile has no C).
+        K (float): Ignored (profile has no K).
+
+    Returns:
+        ndarray: Profile, 1 at the centre and 0 far from it (multiply by A in mag).
+    """
+    x = np.clip(phi / D, -60.0, 60.0)
+    return np.exp(-0.5 * x**2)
+
+
+def prof6(phi, D, G=None, C=0.0, K=0.0):  # Table 2 #6
+    """Normalised eclipse profile: Table 2 profile 6, a triangle of half-width D.
+
+    The paper writes 1/2 - |u| + ||u| - 1/2| with u = phi / (2 D): 1 - |phi| / D inside
+    |phi| < D and 0 outside.
+
+    Args:
+        phi (ndarray): Phase offset from the eclipse centre (cycles).
+        D (float): Half-width of the base (cycles).
+        G (float): Ignored (profile has no Gamma).
+        C (float): Ignored (profile has no C).
+        K (float): Ignored (profile has no K).
+
+    Returns:
+        ndarray: Profile, 1 at the centre and 0 outside |phi| >= D (multiply by A in mag).
+    """
+    u = np.abs(np.asarray(phi, float)) / (2.0 * D)
+    return 0.5 - u + np.abs(u - 0.5)
+
+
+def prof7(phi, D, G=None, C=0.0, K=0.0):  # Table 2 #7
+    """Normalised eclipse profile: Table 2 profile 7, exp(1 - cosh x), x = phi / D.
+
+    Args:
+        phi (ndarray): Phase offset from the eclipse centre (cycles).
+        D (float): Width parameter (cycles).
+        G (float): Ignored (profile has no Gamma).
+        C (float): Ignored (profile has no C).
+        K (float): Ignored (profile has no K).
+
+    Returns:
+        ndarray: Profile, 1 at the centre and 0 far from it (multiply by A in mag).
+    """
+    x = np.clip(phi / D, -60.0, 60.0)
+    return np.exp(1.0 - np.cosh(x))
+
+
+PROFILES = {1: prof1, 2: prof2, 3: prof3, 4: prof4, 5: prof5, 6: prof6, 7: prof7}
+
+# Shape parameters each Table 2 profile uses, besides the amplitude A.
+PROFILE_SHAPE = {
+    1: ("D", "G", "C"),
+    2: ("D", "G"),
+    3: ("D", "G"),
+    4: ("D", "G"),
+    5: ("D",),
+    6: ("D",),
+    7: ("D",),
+}
 
 
 # ------------------------------------------------------------------ model
@@ -93,42 +166,56 @@ class EBModel:
 
     F(theta) = sum_k A_k prof(phi_k) + sum H_k cos(2 pi k theta) [+ S1 sin(2 pi theta)].
 
-    Parameter dict keys: A1, A2 (mag), D1, G1, C1 (D2, G2, C2 optional; if absent they
-    equal D1, G1, C1), H<k> (mag) for k in ``harmonics``, S1 (mag) if ``ocon``.
+    Parameter dict keys: A1, A2 (mag) and the shape parameters of the profile
+    (``PROFILE_SHAPE``: D1, G1, C1 for profile 1; D1, G1 for 2 to 4; D1 for 5 to 7); the
+    eclipse 2 shape keys D2, G2, C2 are optional and equal the eclipse 1 values if absent.
+    With ``kterm`` (profile 1 only, Eq. 14) K1, and optionally K2, are also required.
+    H<k> (mag) for k in ``harmonics``, S1 (mag) if ``ocon``.
 
     Optional second component per eclipse k (EXTENSION, not in the paper): if the keys
     A<k>b, D<k>b, G<k>b are present, A<k>b * profile(phi; D<k>b, G<k>b, C=0) is added
     to eclipse k. This lets a flat bottom and steep walls coexist; amplitudes may be negative.
 
     Attributes:
-        profile (int): Table 2 profile number (1 to 4).
+        profile (int): Table 2 profile number (1 to 7).
         harmonics (tuple): Orders k of the cosine terms.
         ocon (bool): Whether the O'Connell sine term S1 is included.
+        kterm (bool): Whether the Eq. (14) quartic term K is used (profile 1 only).
     """
 
-    def __init__(self, profile=1, harmonics=(2,), ocon=False):
+    def __init__(self, profile=1, harmonics=(2,), ocon=False, kterm=False):
         """Store the model configuration.
 
         Args:
-            profile (int): Table 2 profile number (1 to 4).
+            profile (int): Table 2 profile number (1 to 7).
             harmonics (tuple of int): Orders of the cosine terms H_k.
             ocon (bool): Include the O'Connell sine term S1.
+            kterm (bool): Use the Eq. (14) quartic term K (profile 1 only).
+
+        Raises:
+            ValueError: If ``profile`` is not 1 to 7, or ``kterm`` is used with another profile.
         """
+        if profile not in PROFILES:
+            raise ValueError(f"Unknown Table 2 profile {profile!r}; use 1 to 7.")
+        if kterm and profile != 1:
+            raise ValueError("The K term (Eq. 14) is defined for profile 1 only.")
         self.profile, self.harmonics, self.ocon = profile, tuple(harmonics), ocon
+        self.kterm = bool(kterm)
 
     def names(self, shared_shape=True):
         """Names of the template parameters that can be fitted.
 
         Args:
-            shared_shape (bool): If True the two eclipses share D, G, C; otherwise D2, G2, C2
-                are listed as well.
+            shared_shape (bool): If True the two eclipses share the shape parameters of the
+                profile; otherwise the eclipse 2 versions are listed as well.
 
         Returns:
             list of str: Parameter names.
         """
-        n = ["A1", "A2", "D1", "G1", "C1"]
+        shape = list(PROFILE_SHAPE[self.profile]) + (["K"] if self.kterm else [])
+        n = ["A1", "A2"] + [f"{s}1" for s in shape]
         if not shared_shape:
-            n += ["D2", "G2", "C2"]
+            n += [f"{s}2" for s in shape]
         n += [f"H{k}" for k in self.harmonics]
         return n + (["S1"] if self.ocon else [])
 
@@ -148,12 +235,11 @@ class EBModel:
         for k in (1, 2):
             c = 0.5 * (k - 1)
             phi = (theta - c) - np.round(theta - c)
-            F += p[f"A{k}"] * prof(
-                phi,
-                p.get(f"D{k}", p["D1"]),
-                p.get(f"G{k}", p["G1"]),
-                p.get(f"C{k}", p["C1"]),
-            )
+            shape = {
+                name: p.get(f"{name}{k}", p[f"{name}1"])
+                for name in PROFILE_SHAPE[self.profile] + (("K",) if self.kterm else ())
+            }
+            F += p[f"A{k}"] * prof(phi, **shape)
             if f"A{k}b" in p:
                 F += p[f"A{k}b"] * prof(phi, p[f"D{k}b"], p[f"G{k}b"], 0.0)
         for k in self.harmonics:

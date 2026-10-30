@@ -67,6 +67,22 @@ Reason for doing this first: the paper comparison must rest on an engine that do
 - [x] `sys.path` hacks removed (pytest uses `pythonpath` in `pyproject.toml`; scripts need the package installed or `PYTHONPATH=src`). [ ] One place for configuration (`FitConfig` or successor): still open, module constants are spread over `tom`, `extensions`, `pipeline`.
 - [x] Timing module wrapped as is (`tom.py`); per-eclipse-type (primary, secondary) outputs preserved (EK Com 70/68 unchanged).
 
+### Phase 3b: paper completeness (before Phase 4, agreed 2026-10-30)
+- [x] Table 2 #1 to #4 verified against the printed table (page 8); #5 (Gaussian), #6 (triangle, half-width D), #7 (exp(1 - cosh)) added with `PROFILE_SHAPE` (which of D, G, C each profile uses). Tests in `tests/test_profiles.py` (Table 2 relations, fit recovery). Pipeline guard: `run_staged_fit` raises for profiles 5 to 7; generalising it belongs to Phase 4.
+- [x] Eq. 14 K term: `EBModel(profile=1, kterm=True)`, keys `K1` (optional `K2`), off by default; synthetic transit test recovers K. Not yet in `FitConfig` or the pipeline (Phase 4 / exoplanet use), `wall_band` works through the model.
+- [ ] Exposure-time integration of the model (not in the paper): supersample over the exposure; first test on EK Com (10 min, about 5.6 points per FWHM) to see how much of the ~20 mmag wall residual it explains; later an automatic switch on cadence / FWHM.
+
+### Deferred (decided 2026-10-30, revisit when needed)
+- Multicolour model, Eq. 16 (Lambda dependence a_k1 + a_k2 Lambda) with per-instrument instrumental terms (Eq. 10): when multi-band data arrive; also for a proper V477 Lyr band test.
+- Legendre / quasi-orthogonal polynomial-harmonic instrumental functions (Eq. 11): same fit span for polynomials, only conditioning; harmonics only for long segments with strong trends.
+- Joint solution of ephemeris, Pdot and all shifts; orthogonalisation including Pdot; higher period terms; exact Pdot solution (long time spans).
+- Light-time effect, apsidal motion, eccentric orbits, radial velocities, Model II (out of scope for now; eccentric orbits stop with an explicit error).
+- Eclipse asymmetry term (AV Del out-of-eclipse asymmetry of about 15 mmag).
+- One place for configuration (`FitConfig` or successor): constants spread over `tom`, `extensions`, `pipeline`; settle before Phase 4 output format.
+- Open validation items: V477 Lyr Gamma (1.28 against 0.79, band hypothesis untested), EK Com C2 (2.2 sigma), Table 1 AR Aur period erratum candidate (to tell Z. Mikulasek), XY Boo, `ebfit`, MAVKA comparison.
+- Local-continuum measurement of the secondary depth in `initial_guess` (bright-secondary case), part of Phase 4 feature extraction.
+- Write to Z. Mikulasek with the results (developer).
+
 ### Phase 4: automatic profile selection
 - [ ] Light-curve analysis features from the fold (depths, widths, flatness, out-of-eclipse curvature, reflection effect, secondary phase check).
 - [ ] Hypothesis tree: detached, contact, semi-detached, reflection, eccentric flag.
@@ -90,3 +106,4 @@ Reason for doing this first: the paper comparison must rest on an engine that do
 - 2026-10-29: Phase 1 leftovers done. Rejected events (E from T0, predicted JD, reason) are written into the ToM headers via `time_both_walls(rejected=...)` and `write_timing_ascii(rejected=...)`; EK Com still 70/68, one rejected secondary (`one_side_uncovered`). Google docstrings for all functions in `mikulasek_eb.py`, `eb_tuning.py`; no `print` left in `scripts/` or `working_scripts/`; AA And regression test and rejection-header test added (23 tests). Next: Phase 3, awaiting confirmation.
 - 2026-10-30: Phase 3 first pass: package `mikulasek_eb` under `src/` (old `scripts/` engine and `working_scripts` library modules split into modules and removed; `examples/` holds the two CLI examples). 23 tests pass, EK Com timings 70/68 unchanged. Open: editable install (`pip install -e .`, developer to run), one configuration place, folder rename `mikulasek_eb_2`, stray `mikulasek-eb-fitting.skill`, untracked `mikulasek_eb/` and `mikulasek_eb2.back/` at the repo root (not touched).
 - 2026-10-30: Package moved to its own repository (/home/voz/projects/UPJS/mikulasek_eb, GitHub olgavoz1971/mikulasek-eb), black applied, README added, 23 tests pass. Folder rename and the editable-install note are obsolete. Still open: one configuration place; stray `.skill` file left behind in skvo_veb_2 history only.
+- 2026-10-30: Agreed order before Phase 4: Phase 3b (profiles check and #5 to #7, K term, exposure-time integration); the rest is listed under Deferred.

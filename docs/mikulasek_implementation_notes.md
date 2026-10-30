@@ -16,7 +16,8 @@
 |---|---|---|---|
 | LC model F = F<sub>e</sub> + F<sub>p</sub> + F<sub>c</sub> in magnitudes; instrumental term Y<sub>0r</sub> (Eqs. 10, 12) | `EBModel`, baselines in `fit_global` | ✅ | The intrinsic F has zero mean without eclipses; the level is absorbed by the baseline. |
 | Eclipse profile, Eq. 13 = Table 2 #1: A(1 + Cφ²/D²){1 − [1 − exp(1 − cosh(φ/D))]^Γ}, eclipses at phase 0 and 0.5 | `profile=1` | ✅ | A, D, Γ, C are per eclipse in the paper. By default I share D, Γ, C between the two eclipses (the paper's usual economy: D₁≅D₂, Γ₁≅Γ₂, C₁≅C₂). Separate values are set by adding `D2, G2, C2` to the parameter dictionary. The paper itself uses different C₁, C₂ for EK Com. |
-| Alternative eclipse functions, Table 2 #2–#4 | `profile=2,3,4` | ✅ | #4 is the Andronov-type function: A·Re[(1 − \|φ/D\|^Γ)^{3/2}]. |
+| Alternative eclipse functions, Table 2 #2–#7 | `profile=2…7` | ✅ | Formulas checked against the printed Table 2 (2026-10-30). #4 is the Andronov-type function A·Re[(1 − \|φ/D\|^Γ)^{3/2}]. #5 Gaussian, #6 triangle of half-width D, #7 exp(1 − cosh) take only A, D (no Γ, C). The staged pipeline (`run_staged_fit`) supports profiles 1 to 4 only, because it frees Γ; profiles 5 to 7 are fitted with `fit_global`. |
+| Eq. 14, quartic term K (for very precise transit data) | `EBModel(profile=1, kterm=True)` | ✅ | Keys `K1` (and optional `K2`); off by default, as in the paper where K is introduced only when needed. Recovery tested on a synthetic transit. Not yet handled by `FitConfig` or the pipeline. |
 | Proximity cosines and O'Connell sine, Eq. 15 | `harmonics=(…)`, `ocon=True` | ✅ | Notation differs: `H<k>` is the amplitude of cos(2πkϑ) (the paper's A<sub>k</sub>), `S1` is sin(2πϑ). Any subset of harmonics is allowed, e.g. the XY Boo model (Eq. 18) uses cos 4πϑ and cos 6πϑ only: `harmonics=(2,3)`. |
 | Phase function ϑ = ϑ₁ − Ṗϑ₁²/2 and Θ(E) = M₀ + P₀E + ½P₀ṖE² (Eqs. 7, 8, 17) | `phase`, `predicted_time` | ✅ | Only the Ṗ term. The paper (footnote 6) quotes the deviation of this approximation from the exact solution for XY Boo: < 1.9×10⁻⁵ in phase and < 0.3 s in time. I have not checked it for larger Ṗ·span. |
 | Instrumental term as a linear combination of functions of time (Eq. 11) | `seg`, `order` | ⚠️ | Polynomials of normalised time per segment only. Not implemented: Legendre or quasi-orthogonal polynomial-harmonic functions; weighted-variance normalisation. The coefficients are eliminated by linear least squares inside every iteration (variable projection) instead of being solved jointly. Point estimates should agree. Parameter uncertainties come from the projected Jacobian (approximately the marginal covariance). I have not checked this against a joint solution. |
@@ -83,7 +84,7 @@
 - **Agent skill.** All thresholds (for example "rms ≲ 1.5× noise") are my heuristics, not the paper's.
 
 ### 2.4 The paper's own extra term (K) does not replace 2.1
-Eq. 14 adds a quartic factor, A(1 + Cφ²/D² + Kφ⁴/D⁴){…}. It is written for exoplanet transits (n<sub>e</sub> = 1) "in cases of very precise measurements", and I did not implement it in the code. I tested it separately on ideal geometric flat-bottomed occultations:
+Eq. 14 adds a quartic factor, A(1 + Cφ²/D² + Kφ⁴/D⁴){…}. It is written for exoplanet transits (n<sub>e</sub> = 1) "in cases of very precise measurements". It is now in the package (`kterm=True`, 2026-10-30); the test below was done earlier with a separate script on ideal geometric flat-bottomed occultations:
 
 | Flat width / contact width | rms, profile 1 (C) | rms, + K | rms, two-component |
 |---|---|---|---|
@@ -105,7 +106,6 @@ K gives little in this idealised test.
 | Higher-order period terms (P̈ …, Eqs. 6–8), the exact Ṗ solution (footnote 6) | Long time spans with strong period change. |
 | **Light-time effect** (third body) and **apsidal motion** phase models (Sect. 2.2) | Needed for long-term period studies. Not needed within one TESS sector. |
 | **Eccentric orbits** (phase rectification; unpublished in the paper, footnote 3) | See section 3b. The code stops at "secondary not at phase 0.5". |
-| Table 2 profiles #5–#7 (Gaussian, piecewise-linear, exp(1 − cosh)) | Only 2- and 3-parameter simple functions. |
 | **Multicolour model** (Eq. 16, Λ = λ₀/λ<sub>eff</sub> − 1; a<sub>k1</sub> + a<sub>k2</sub>Λ in Eq. 18) | For joint TESS + ground-based multiband fits. |
 | Baseline alternatives: Legendre or quasi-orthogonal polynomial-harmonic functions (Eq. 11); weighted normalisation | Long segments with strong instrumental trends. |
 | Joint solution with **radial velocities** (Eq. 19) and published minima times; hybrid Model II (template from a physical code) | Combined analyses as for XY Boo. |

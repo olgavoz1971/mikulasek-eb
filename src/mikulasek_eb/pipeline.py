@@ -166,8 +166,14 @@ def run_staged_fit(
 
     Raises:
         RuntimeError: If multi-start finds no valid solution.
-        ValueError: If the folded secondary is not an eclipse.
+        ValueError: If the folded secondary is not an eclipse, or the profile is not
+            one of the Table 2 profiles 1 to 4 (the staged fit frees Gamma).
     """
+    if config.profile not in (1, 2, 3, 4):
+        raise ValueError(
+            f"run_staged_fit supports Table 2 profiles 1 to 4 (they have Gamma); "
+            f"got profile {config.profile}. Fit profiles 5 to 7 with fit_global."
+        )
     order = config.baseline_order
     if config.gap_split_days is None:
         seg = None

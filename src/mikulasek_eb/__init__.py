@@ -10,7 +10,8 @@ Equations used
     Eq. (17)  quadratic phase function  theta = v - Pdot v^2/2, v=(t-M0)/P0 ;
               Theta(E) = M0 + P0 E + 0.5 P0 Pdot E^2
     Eq. (9)   per-interval time shifts (O-C) of a fixed template -> "virtual minima"
-    Table 2   alternative eclipse profiles (1-4 implemented; 4 = Andronov-type)
+    Eq. (14)   optional quartic term K x^4 in profile 1 (EBModel(kterm=True))
+    Table 2   eclipse profiles 1 to 7 (4 = Andronov-type)
 
 Conventions
     * light curves in magnitudes; eclipse depth A > 0 means fainter
@@ -36,7 +37,20 @@ Plotting lives in ``mikulasek_eb.plotting`` (needs matplotlib) and is not import
 
 from __future__ import annotations
 
-from .model import PROFILES, EBModel, phase, predicted_time, prof1, prof2, prof3, prof4
+from .model import (
+    PROFILE_SHAPE,
+    PROFILES,
+    EBModel,
+    phase,
+    predicted_time,
+    prof1,
+    prof2,
+    prof3,
+    prof4,
+    prof5,
+    prof6,
+    prof7,
+)
 from .fit import (
     FitResult,
     FitDidNotConverge,
@@ -90,6 +104,10 @@ __all__ = [
     "prof2",
     "prof3",
     "prof4",
+    "prof5",
+    "prof6",
+    "prof7",
+    "PROFILE_SHAPE",
     "FitResult",
     "FitDidNotConverge",
     "fit_global",

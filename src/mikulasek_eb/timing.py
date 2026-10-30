@@ -88,8 +88,9 @@ def fit_minimum(
     k = 1 if abs(E - round(E)) < 1e-6 else 2
     base = dict(p)
     for kk in (1, 2):
-        for nm in "DGC":
-            base.setdefault(f"{nm}{kk}", p[f"{nm}1"])
+        for nm in "DGCK":
+            if f"{nm}1" in p:
+                base.setdefault(f"{nm}{kk}", p[f"{nm}1"])
     scales = list(free)
     nui = _Nuisance(ts, w, None, order)
 
