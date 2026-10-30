@@ -137,3 +137,7 @@ Reason for doing this first: the paper comparison must rest on an engine that do
 - Selector is TESS-only (documented in README, spec section 12, notes section 9).
 - Precise calibration: PHOEBE synthetic set with TESS cadence/gaps/noise (data to come).
 - Meanwhile: supervised per-star analysis (run tools, judge by residual numbers and plots).
+
+## Supervised star log
+- AR Aur S19 (h12_b1): out-of-eclipse rms 0.58 mmag, in eclipse 2.9 mmag, worst phase bin 2.1 mmag. Catalogue sigma (0.16 mmag) is far below the real scatter, so rms/noise = 15 is misleading; the fit is good. The eclipse residual repeats in every cycle with the same shape at the knees (template shape defect, not timing: O-C scatter 2 s, equal to the formal error). Rule lessons: do not judge a fit by rms/catalogue sigma; n_eff not measurable on such clean data.
+- Tool: `examples/diagnose_fit.py <label|path.vot>` (numbers + PNG).
