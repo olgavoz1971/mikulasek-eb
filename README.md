@@ -15,6 +15,12 @@ Phenomenological light-curve model and eclipse timing for eclipsing binaries, im
 
 Circular orbits and single-band magnitudes only.
 
+A plain-language description of the automatic script (`diagnose_fit.py`) is in
+`docs/pipeline_explanation_for_dummies.md` (profiles versus candidates).
+
+A plain-language description of the automatic script (`diagnose_fit.py`) is in
+`docs/pipeline_explanation_for_dummies.md` (profiles versus candidates).
+
 ## Layout
 
 ```
