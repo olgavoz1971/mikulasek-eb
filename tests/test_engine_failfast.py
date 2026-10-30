@@ -7,7 +7,7 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-import mikulasek_eb.fit as engine
+import mikulasek_eb.fitting as engine
 import mikulasek_eb.timing as timing_module
 from mikulasek_eb import EBModel, FitDidNotConverge, phase, virtual_minima
 

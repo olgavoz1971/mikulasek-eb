@@ -8,7 +8,7 @@ import numpy as np
 from astropy.time import Time
 
 from .model import EBModel, phase
-from .fit import FitResult, _Nuisance
+from .fitting import FitResult, _Nuisance
 from .tuning import binned_residuals
 
 # Phase half-width for out-of-eclipse residual clip (cycles).

@@ -9,7 +9,7 @@ from astropy.time import Time
 
 from .model import EBModel, phase
 from .tom import HALF_ORBIT_WINDOW, TIMING_BASELINE_ORDER
-from .fit import fit_global
+from .fitting import fit_global
 from .timing import virtual_minima
 from .tuning import wall_band
 

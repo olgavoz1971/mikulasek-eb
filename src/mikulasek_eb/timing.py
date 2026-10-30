@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 import numpy as np
 from scipy.optimize import least_squares
 
-from .fit import _Nuisance, _check_solution, _cov
+from .fitting import _Nuisance, _check_solution, _cov
 from .model import phase, predicted_time
 
 logger = logging.getLogger(__name__)

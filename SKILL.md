@@ -12,7 +12,7 @@ number or a plot, every run is logged, and conclusions state what was and was no
 
 ## 0. What you have
 
-The package `src/mikulasek_eb` (model, fit, timing, tuning, extensions, tom, pipeline, io, plotting) is an independent re-implementation of Mikulášek (2015, A&A 584, A8),
+The package `src/mikulasek_eb` (model, fitting, timing, tuning, extensions, tom, pipeline, io, plotting) is an independent re-implementation of Mikulášek (2015, A&A 584, A8),
 not the author's code. It is validated against the paper's Table 1 (shape parameters, four stars; see `docs/mikulasek_implementation_notes.md`, section 7), not against MAVKA.
 Read `references/api.md` for signatures. Related modules: `tuning` (starting values,
 multi-start, residuals, window scan, clipping), `pipeline` (staged fit), `tom` (timing files);

@@ -18,7 +18,7 @@ Circular orbits and single-band magnitudes only.
 ## Layout
 
 ```
-src/mikulasek_eb/   the package (model, fit, timing, tuning, extensions, tom, pipeline, io, plotting)
+src/mikulasek_eb/   the package (model, fitting, timing, tuning, extensions, tom, pipeline, io, plotting)
 working_scripts/    per-star fit scripts and the Table 1 comparison
 examples/           synthetic workflow and timing comparison
 tests/              synthetic, fail-fast, regression on real TESS data, paper comparison

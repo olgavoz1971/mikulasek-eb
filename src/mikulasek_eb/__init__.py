@@ -52,9 +52,8 @@ from .model import (
     prof7,
 )
 from .exposure import estimate_cadence_days, estimate_exposure_days, suggest_nsub
-from .fit import (
+from .fitting import (
     FitResult,
-    FitDidNotConverge,
     fit_global,
     fit_global_iterative,
     correlation_matrix,
@@ -84,9 +83,18 @@ from .tuning import (
     oc_diagnostics,
 )
 from .extensions import refine_two_component, eclipse_reweighted_sigma
+from .api import FitOutput, TimingOutput, fit, time, validate_lightcurve
+from .errors import (
+    ConfigError,
+    FitCancelled,
+    FitDidNotConverge,
+    InvalidLightCurve,
+    MikulasekError,
+    NoValidSolution,
+)
+from .solution import ModelSolution
 from .config import (
     Config,
-    ConfigError,
     DataSetup,
     FitConfig,
     FitPolicy,
@@ -107,6 +115,16 @@ from .io import load_tess_votable
 from .helpers import absolute_jd_to_mjd
 
 __all__ = [
+    "fit",
+    "time",
+    "FitOutput",
+    "TimingOutput",
+    "validate_lightcurve",
+    "ModelSolution",
+    "MikulasekError",
+    "FitCancelled",
+    "InvalidLightCurve",
+    "NoValidSolution",
     "Config",
     "ConfigError",
     "DataSetup",

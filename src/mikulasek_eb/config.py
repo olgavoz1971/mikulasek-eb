@@ -23,6 +23,8 @@ import json
 from dataclasses import dataclass, field, fields
 from pathlib import Path
 
+from .errors import ConfigError
+
 SCHEMA_VERSION = 1
 
 # Fraction-of-phase limit for any timing window: whole phase around one event.
@@ -36,10 +38,6 @@ MAX_SIGMA_FACTOR = 5.0
 
 # Fields that are tuples in Python and lists in JSON.
 _TUPLE_FIELDS = {"harmonics", "gamma_starts", "two_comp_eclipses", "local_windows"}
-
-
-class ConfigError(ValueError):
-    """Raised when a configuration is incomplete, inconsistent or has unknown keys."""
 
 
 @dataclass(frozen=True)

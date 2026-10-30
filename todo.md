@@ -62,7 +62,7 @@ Reason for doing this first: the paper comparison must rest on an engine that do
 - [x] Implementation notes updated (`docs/mikulasek_implementation_notes.md`): paper remedy C1 != C2, new section 7 with the validation, paper period erratum candidate.
 
 ### Phase 3: package structure
-- [x] Standalone installable package inside this folder: `src/mikulasek_eb/` with `model, fit, timing, tuning, extensions, tom, helpers, pipeline, io, plotting`, `pyproject.toml` (dist name `mikulasek-eb`, extras `plot`, `tess`, `test`).
+- [x] Standalone installable package inside this folder: `src/mikulasek_eb/` with `model, fitting, timing, tuning, extensions, tom, helpers, pipeline, io, plotting`, `pyproject.toml` (dist name `mikulasek-eb`, extras `plot`, `tess`, `test`).
 - [x] Extensions (two-component, eclipse weights and their acceptance checks) in `extensions.py`, off by default.
 - [x] `sys.path` hacks removed (pytest uses `pythonpath` in `pyproject.toml`; scripts need the package installed or `PYTHONPATH=src`). [ ] One place for configuration (`FitConfig` or successor): still open, module constants are spread over `tom`, `extensions`, `pipeline`.
 - [x] Timing module wrapped as is (`tom.py`); per-eclipse-type (primary, secondary) outputs preserved (EK Com 70/68 unchanged).
@@ -86,10 +86,10 @@ Reason for doing this first: the paper comparison must rest on an engine that do
 
 ### Phase 3c: configuration (agreed 2026-10-30; single light curve first)
 - [x] Step 1: layered `Config` (`ModelSpec`, `DataSetup`, `FitPolicy`, `TimingRecipe`), validation, JSON round trip, hash; former constants moved into `FitPolicy` / `TimingRecipe`; pipeline accepts `Config` or `FitConfig` and stores the config in its result; `time_with_recipe`; recipe and hash in the ToM header. 66 tests pass, regression numbers unchanged. Notes section 8.
-- [ ] Step 2: `ModelSolution` (spec + values + errors + ephemeris + provenance, JSON-serialisable) returned by the fit; pure host-facing functions `fit(...)` and `time(...)`; typed exceptions; progress hook for background callbacks.
+- [x] Step 2: `ModelSolution` (config, values, errors, ephemeris, stats, exposure, provenance; JSON round trip, `solution_hash`, `build_model`); pure host-facing `fit(...)` and `time(...)` in `api.py` (`FitOutput`, `TimingOutput`); typed exceptions in `errors.py` (`ConfigError`, `InvalidLightCurve`, `FitDidNotConverge`, `NoValidSolution`, `FitCancelled`, all with ValueError/RuntimeError bases); progress hook `progress(stage, fraction)` (raising `FitCancelled` from it stops the fit). Module `fit.py` renamed `fitting.py` because the package attribute `fit` is now the function. 75 tests pass.
 - [ ] Step 3: `ParameterPlan` and borrowing between light curves (groups shape, amplitudes, harmonics, ephemeris; staged pipeline respects fixed parameters); timing `template = "reference"`; per-light-curve depth scale for dilution.
 - [ ] Update the per-star scripts to build a `Config` and save it next to the results (they still use `FitConfig`, which keeps working).
-- [ ] Deprecation decision for the flat `FitConfig` (kept for now as the resolved view).
+- [x] `FitConfig` stays as an internal resolved view only; it is not part of the public documentation (decided 2026-10-30).
 - Use cases to keep in mind: host application on a remote server (stateless, cacheable, JSON), local scripts, Jupyter notebooks, analysis with an agent; not only TESS data.
 
 ### Phase 4: automatic profile selection
@@ -118,3 +118,4 @@ Reason for doing this first: the paper comparison must rest on an engine that do
 - 2026-10-30: Agreed order before Phase 4: Phase 3b (profiles check and #5 to #7, K term, exposure-time integration); the rest is listed under Deferred.
 - 2026-10-30: Phase 3b finished: Table 2 #5 to #7, K term, exposure integration. EK Com wall residuals are not exposure smearing (rms unchanged), so the cause stays open (single Gamma ceiling, spots, band). Next: Phase 4, after your decision on configuration design.
 - 2026-10-30: Phase 3c step 1 done (layered configuration). Next: step 2 (`ModelSolution`, pure `fit`/`time` functions), then Phase 4.
+- 2026-10-30: Phase 3c step 2 done (`ModelSolution`, `fit`, `time`, typed errors, progress hook). Next: step 3 (`ParameterPlan`, borrowing), then Phase 4.

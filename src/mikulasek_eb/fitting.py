@@ -6,6 +6,8 @@ import logging
 from dataclasses import dataclass
 
 import numpy as np
+
+from .errors import FitDidNotConverge  # noqa: F401
 from scipy.optimize import least_squares
 
 from .model import phase
@@ -104,10 +106,6 @@ class FitResult:
     rank_deficient: bool = (
         False  # True if the Jacobian is rank deficient (degenerate parameters)
     )
-
-
-class FitDidNotConverge(RuntimeError):
-    """Raised when the Levenberg-Marquardt solver does not report convergence."""
 
 
 def _check_solution(sol, what):

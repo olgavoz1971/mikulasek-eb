@@ -27,8 +27,9 @@ from .extensions import (
 )
 from .helpers import complete_template, out_of_eclipse_phase_mask, report_fit
 from .config import Config, FitConfig
+from .errors import ConfigError, InvalidLightCurve, NoValidSolution
 from .exposure import suggest_nsub
-from .fit import fit_global
+from .fitting import fit_global
 
 logger = logging.getLogger(__name__)
 
@@ -100,6 +101,7 @@ def run_staged_fit(
     period_days: float,
     epoch_jd: float,
     config: Config | FitConfig,
+    progress=None,
 ) -> FitPipelineResult:
     """Run staged global fit and optional two-component primary extension.
 
@@ -114,26 +116,35 @@ def run_staged_fit(
         epoch_jd (float): VOTable PARAM epoch as absolute JD (T0 for E).
         config (Config | FitConfig): Layered configuration, or its flat view (the default
             timing recipe is then recorded in the result).
+        progress (callable | None): ``progress(stage, fraction)`` called after each stage,
+            fraction in [0, 1]. The hook may raise ``FitCancelled`` to stop the fit.
 
     Returns:
         FitPipelineResult: Adopted and diagnostic fit products.
 
     Raises:
-        RuntimeError: If multi-start finds no valid solution.
-        ValueError: If the folded secondary is not an eclipse, or the profile is not
-            one of the Table 2 profiles 1 to 4 (the staged fit frees Gamma).
+        NoValidSolution: If multi-start finds no valid solution.
+        InvalidLightCurve: If the folded secondary is not an eclipse.
+        ConfigError: If the profile is not one of the Table 2 profiles 1 to 4 (the staged
+            fit frees Gamma) or the K term is requested.
     """
+
+    def notify(stage: str, fraction: float) -> None:
+        """Report a finished stage to the optional progress hook."""
+        if progress is not None:
+            progress(stage, fraction)
+
     if isinstance(config, Config):
         layered = config.validate()
         config = layered.to_fit_config()
     else:
         layered = Config.from_fit_config(config)
     if config.kterm:
-        raise ValueError(
+        raise ConfigError(
             "The staged pipeline does not free the K term (Eq. 14); fit it with fit_global."
         )
     if config.profile not in (1, 2, 3, 4):
-        raise ValueError(
+        raise ConfigError(
             f"run_staged_fit supports Table 2 profiles 1 to 4 (they have Gamma); "
             f"got profile {config.profile}. Fit profiles 5 to 7 with fit_global."
         )
@@ -189,7 +200,7 @@ def run_staged_fit(
             config.min_points_per_fwhm,
         )
     if g["A2"] < 0:
-        raise ValueError(
+        raise InvalidLightCurve(
             f"Folded secondary depth A2={g['A2']:.4f} mag is not an eclipse."
         )
     if g["A1"] < config.primary_a2_over_a1_min_ratio * g["A2"]:
@@ -236,6 +247,7 @@ def run_staged_fit(
         order=order,
     )
     report_fit("1 locate eclipses", r1, nf)
+    notify("locate eclipses", 0.15)
 
     r2, rows = multistart_global(
         t_mjd,
@@ -254,8 +266,9 @@ def run_staged_fit(
     for g0, chi2, d1, g1, st in rows:
         logger.info("  G0=%s chi2=%s D1=%s G1=%s %s", g0, chi2, d1, g1, st)
     if r2 is None:
-        raise RuntimeError("Multi-start returned no valid (D>0, G>0) solution.")
+        raise NoValidSolution("Multi-start returned no valid (D>0, G>0) solution.")
     report_fit("2 best multi-start", r2, nf)
+    notify("multi-start", 0.35)
 
     r3 = fit_global(
         t_mjd,
@@ -270,6 +283,7 @@ def run_staged_fit(
         order=order,
     )
     report_fit("3 add C1", r3, nf)
+    notify("curvature C1", 0.5)
     d_rel = r3.err["D1"] / abs(r3.p["D1"])
     g_rel = r3.err["G1"] / abs(r3.p["G1"])
     c1_weak = abs(r3.p["C1"]) < 3.0 * r3.err["C1"]
@@ -309,6 +323,7 @@ def run_staged_fit(
         order=order,
     )
     report_fit("4 separate eclipse shapes", r4, nf)
+    notify("separate eclipse shapes", 0.6)
     if r.chi2 > 0 and (r.chi2 - r4.chi2) / r.chi2 < config.separate_shape_chi2_frac:
         logger.info(
             "Keeping shared eclipse shape (< %.0f%% chi2 drop).",
@@ -352,6 +367,7 @@ def run_staged_fit(
             order=order,
         )
         report_fit("5 after clip", r5, nf)
+        notify("outlier clip", 0.7)
         if r5.chi2 < r.chi2:
             r = r5
             t_work, mag_work, sig_work = t_mjd[keep], mag[keep], sig[keep]
@@ -484,7 +500,7 @@ def run_staged_fit(
         )
         free_ecl = _shape_free_names(r, model)
         if not free_ecl:
-            raise RuntimeError(
+            raise NoValidSolution(
                 "No eclipse parameters left to free in the weighted refit."
             )
         r_w = fit_global(
@@ -514,6 +530,7 @@ def run_staged_fit(
         )
         r = r_w
 
+    notify("done", 1.0)
     return FitPipelineResult(
         model=model,
         adopted=r,

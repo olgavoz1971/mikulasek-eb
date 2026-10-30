@@ -6,7 +6,7 @@ import logging
 
 import numpy as np
 
-from .fit import _Nuisance, fit_global
+from .fitting import _Nuisance, fit_global
 from .timing import fit_ephemeris, virtual_minima
 from .model import phase
 
