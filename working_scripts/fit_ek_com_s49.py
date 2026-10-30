@@ -44,6 +44,7 @@ _ROOT = Path(__file__).resolve().parent.parent
 
 from mikulasek_eb.helpers import absolute_jd_to_mjd, predicted_magnitude
 from mikulasek_eb.io import load_tess_votable
+from mikulasek_eb.api import solution_from_pipeline
 from mikulasek_eb.pipeline import FitConfig, run_staged_fit
 from mikulasek_eb.plotting import plot_global_fit
 from mikulasek_eb.tom import (
@@ -93,6 +94,11 @@ def main() -> None:
     timescale = payload["timescale"]
 
     pipeline = run_staged_fit(t_mjd_full, mag, sig, period, epoch_jd, FIT_CONFIG)
+    solution = solution_from_pipeline(
+        pipeline, len(t_mjd_full), period, epoch_jd, data_id=VOTABLE_PATH.stem
+    )
+    solution.save(_ROOT / "results" / "fit_ek_com_s49_solution.json")
+    pipeline.config.save(_ROOT / "results" / "fit_ek_com_s49_config.json")
     adopted = pipeline.adopted
     single = pipeline.single_component
 

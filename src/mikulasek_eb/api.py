@@ -125,6 +125,69 @@ def validate_lightcurve(t_mjd, mag, sig, period_days: float, epoch_jd: float) ->
         raise InvalidLightCurve(f"Invalid epoch {epoch_jd!r}.")
 
 
+def solution_from_pipeline(
+    result: FitPipelineResult,
+    n_input: int,
+    period_days: float,
+    epoch_jd: float,
+    *,
+    data_id: str | None = None,
+) -> ModelSolution:
+    """Package a staged-pipeline result as a ``ModelSolution``.
+
+    Args:
+        result (FitPipelineResult): Result of ``run_staged_fit``.
+        n_input (int): Number of input points before clipping.
+        period_days (float): Input period (days) given to the pipeline.
+        epoch_jd (float): Input epoch T0 (absolute JD) given to the pipeline.
+        data_id (str | None): Identifier of the data for provenance.
+
+    Returns:
+        ModelSolution: Serialisable solution.
+    """
+    adopted = result.adopted
+    model = result.model
+    stats = dict(
+        chi2=adopted.chi2,
+        dof=adopted.dof,
+        rchi2=adopted.rchi2,
+        rms_mag=adopted.rms,
+        noise_floor_mag=result.noise_floor,
+        rms_over_noise=adopted.rms / result.noise_floor,
+        n_points=len(result.t_mjd),
+        n_input=n_input,
+        rank_deficient=adopted.rank_deficient,
+        two_component="A1b" in adopted.p,
+    )
+    exposure = (
+        None
+        if model.exposure_days is None
+        else dict(days=model.exposure_days, nsub=model.nsub)
+    )
+    solution = ModelSolution(
+        config=result.config,
+        params=plain(adopted.p),
+        errors=plain(adopted.err),
+        ephemeris=plain(adopted.ephem),
+        stats=plain(stats),
+        exposure=exposure,
+        provenance=dict(
+            data_id=data_id,
+            epoch_jd=float(epoch_jd),
+            period_input_days=float(period_days),
+            package_version=package_version(),
+        ),
+    )
+    logger.info(
+        "solution %s: rms %.2f mmag, %d of %d points",
+        solution.solution_hash(),
+        1e3 * adopted.rms,
+        len(result.t_mjd),
+        n_input,
+    )
+    return solution
+
+
 def fit(
     t_mjd,
     mag,
@@ -164,45 +227,8 @@ def fit(
     result = run_staged_fit(
         t_mjd, mag, sig, period_days, epoch_jd, config, progress=progress
     )
-    adopted = result.adopted
-    model = result.model
-    stats = dict(
-        chi2=adopted.chi2,
-        dof=adopted.dof,
-        rchi2=adopted.rchi2,
-        rms_mag=adopted.rms,
-        noise_floor_mag=result.noise_floor,
-        rms_over_noise=adopted.rms / result.noise_floor,
-        n_points=len(result.t_mjd),
-        n_input=len(t_mjd),
-        rank_deficient=adopted.rank_deficient,
-        two_component="A1b" in adopted.p,
-    )
-    exposure = (
-        None
-        if model.exposure_days is None
-        else dict(days=model.exposure_days, nsub=model.nsub)
-    )
-    solution = ModelSolution(
-        config=result.config,
-        params=plain(adopted.p),
-        errors=plain(adopted.err),
-        ephemeris=plain(adopted.ephem),
-        stats=plain(stats),
-        exposure=exposure,
-        provenance=dict(
-            data_id=data_id,
-            epoch_jd=float(epoch_jd),
-            period_input_days=float(period_days),
-            package_version=package_version(),
-        ),
-    )
-    logger.info(
-        "solution %s: rms %.2f mmag, %d of %d points",
-        solution.solution_hash(),
-        1e3 * adopted.rms,
-        len(result.t_mjd),
-        len(t_mjd),
+    solution = solution_from_pipeline(
+        result, len(t_mjd), period_days, epoch_jd, data_id=data_id
     )
     return FitOutput(solution, result.t_mjd, result.mag, result.sig, result)
 

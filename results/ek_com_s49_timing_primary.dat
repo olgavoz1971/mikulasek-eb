@@ -1,4 +1,4 @@
-# lightcurve: /home/voz/projects/UPJS/skvo_veb_2/auxiliary/mikulasek_eb_2/data/EK_Com_sector_49.vot
+# lightcurve: /home/voz/projects/UPJS/mikulasek_eb/data/EK_Com_sector_49.vot
 # period_days: 0.2666852
 # t0_jd: 2452500.0114000002
 # folding: E = round(2*(JD-T0)/P)/2 from the VOTable epoch T0
