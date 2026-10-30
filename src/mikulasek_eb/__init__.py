@@ -51,7 +51,12 @@ from .model import (
     prof6,
     prof7,
 )
-from .exposure import estimate_cadence_days, estimate_exposure_days, suggest_nsub
+from .exposure import (
+    estimate_cadence_days,
+    estimate_exposure_days,
+    suggest_nsub,
+    tess_exposure_days,
+)
 from .fitting import (
     FitResult,
     fit_global,
@@ -151,6 +156,7 @@ __all__ = [
     "estimate_cadence_days",
     "estimate_exposure_days",
     "suggest_nsub",
+    "tess_exposure_days",
     "PROFILES",
     "EBModel",
     "phase",

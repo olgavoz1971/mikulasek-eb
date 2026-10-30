@@ -10,7 +10,7 @@ import pytest
 import mikulasek_eb as eb
 from mikulasek_eb.config import DataSetup, ModelSpec
 from mikulasek_eb.errors import ConfigError
-from mikulasek_eb.exposure import estimate_exposure_days
+from mikulasek_eb.exposure import tess_exposure_days
 from mikulasek_eb.helpers import absolute_jd_to_mjd
 from mikulasek_eb.io import load_tess_votable
 from mikulasek_eb.model import EBModel, phase
@@ -138,7 +138,7 @@ def _borrow(ref, name, free):
     data = DataSetup(
         baseline_order=3,
         gap_split_days=0.5,
-        exposure_days=estimate_exposure_days(t),
+        exposure_days=tess_exposure_days(t)[0],
     )
     return (
         t,

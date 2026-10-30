@@ -7,7 +7,8 @@ the residual rms in eclipse, out of eclipse and after binning in phase.
 Run::
 
     python examples/diagnose_fit.py "AR Aur S19"
-    python examples/diagnose_fit.py path/to/lc.vot [candidate_name]
+    python examples/diagnose_fit.py path/to/lc.vot
+    python examples/diagnose_fit.py "NSV 807 S04" --show   # interactive window (zoom, pan)
 """
 
 from __future__ import annotations
@@ -17,7 +18,8 @@ import sys
 
 import matplotlib
 
-matplotlib.use("Agg")
+if "--show" not in sys.argv:
+    matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 from select_models import OUT, resolve
@@ -54,7 +56,8 @@ def binned(
 def main() -> None:
     """Select a model, print residual statistics and save the diagnostic PNG."""
     logging.basicConfig(level=logging.WARNING)
-    label, path = resolve(sys.argv[1])
+    args = [a for a in sys.argv[1:] if a != "--show"]
+    label, path = resolve(args[0])
     payload = load_tess_votable(path)
     t = absolute_jd_to_mjd(payload["t"])
     r = select_model(
@@ -124,6 +127,8 @@ def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     fig.savefig(out, dpi=110)
     print(f"  saved {out}")
+    if "--show" in sys.argv:
+        plt.show()
 
 
 if __name__ == "__main__":

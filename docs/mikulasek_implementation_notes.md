@@ -226,3 +226,10 @@ The selector (features, rules, evidence stage) applies to TESS data only; it
 is not expected to work on Gaia. Calibration will use PHOEBE synthetic light
 curves with TESS cadence and noise; ground truth is the fit quality, not a
 visual choice of profile. See `feature_spec.md`, section 12.
+
+## 10. TESS exposure and template smoothness (2026-10-30)
+
+- **Exposure.** For every TESS cadence except 20 s the effective exposure is 0.8 of the cadence (onboard cosmic-ray mitigation, for example 480 s at a 600 s cadence); at 20 s it is the full cadence. This is a mission property that holds for SPOC, QLP and full-frame light curves. `tess_exposure_days` implements it; the features record the rule as `exposure_source` ("TESS: 0.8 x cadence"). Non-TESS data need an explicit exposure.
+- **Sub-samples.** The exposure average is a midpoint sum over `nsub` samples. With the old minimum of 5 the sharp bottom of a profile with G < 1 produced visible corners in the template (up to 4 mmag at 30 min on NSV 807). The minimum is now 21; the template error against `nsub = 401` is 0.11 mmag. The fit rms barely changed (4.27 to 4.24 mmag), so earlier fits were not materially wrong.
+- **Remaining corners.** A V-shaped minimum smeared by a boxcar becomes flat with corners at plus and minus half the exposure; that is the model, not numerical noise.
+- **Check.** AA And: 30-min borrowed timings minus 2-min timings, primary mean 0.8 s with scatter 1.7 s, secondary mean 0.7 s with scatter 5.8 s (before: 0.7 and 1.9 s, 0.7 and 5.8 s).

@@ -15,7 +15,7 @@
     "data": {
       "baseline_order": 1,
       "gap_split_days": 0.5,
-      "exposure_days": 0.020833654329180717,
+      "exposure_days": 0.016666923463344575,
       "exposure_nsub": null
     },
     "policy": {
@@ -60,46 +60,46 @@
   "table": [
     {
       "name": "h123_b0",
-      "config_hash": "90d350d5dac9",
+      "config_hash": "3ebbaf5b2732",
       "status": "ok",
-      "rms_mmag": 3.8975594642479825,
+      "rms_mmag": 3.8927314838302562,
       "k": 14,
       "n_common": 1116,
-      "bic": -911.2720642543378,
-      "delta_bic": 5.622167277721019,
+      "bic": -911.4896724774957,
+      "delta_bic": 5.658812158372825,
       "two_component": false
     },
     {
       "name": "h123_b1",
-      "config_hash": "de463904a512",
+      "config_hash": "da333b94d347",
       "status": "ok",
-      "rms_mmag": 3.587120725295927,
+      "rms_mmag": 3.581929565600189,
       "k": 16,
       "n_common": 1116,
-      "bic": -916.8942315320588,
+      "bic": -917.1484846358685,
       "delta_bic": 0.0,
       "two_component": false
     },
     {
       "name": "h2_b0",
-      "config_hash": "ae1a57bc52fb",
+      "config_hash": "23ac49b19a5c",
       "status": "ok",
-      "rms_mmag": 3.913009666504306,
+      "rms_mmag": 3.908124399048664,
       "k": 15,
       "n_common": 1116,
-      "bic": -906.1026433437967,
-      "delta_bic": 10.791588188262153,
+      "bic": -906.3219652926899,
+      "delta_bic": 10.826519343178575,
       "two_component": true
     },
     {
       "name": "h2_b1",
-      "config_hash": "74171924918a",
+      "config_hash": "0fb08b93a4b8",
       "status": "ok",
-      "rms_mmag": 3.6036056368733815,
+      "rms_mmag": 3.598938262196823,
       "k": 17,
       "n_common": 1116,
-      "bic": -911.6144128133373,
-      "delta_bic": 5.279818718721572,
+      "bic": -911.8419488753638,
+      "delta_bic": 5.306535760504744,
       "two_component": true
     }
   ],
@@ -111,5 +111,5 @@
   "remarks": [],
   "n_eff": 87.78158812709847,
   "n_eff_measured": true,
-  "features_hash": "65c598892584"
+  "features_hash": "55f1a100ec04"
 }

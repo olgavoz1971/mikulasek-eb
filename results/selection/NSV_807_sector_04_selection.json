@@ -14,7 +14,7 @@
     "data": {
       "baseline_order": 1,
       "gap_split_days": 0.5,
-      "exposure_days": 0.020832910668104887,
+      "exposure_days": 0.01666632853448391,
       "exposure_nsub": null
     },
     "policy": {
@@ -59,45 +59,45 @@
   "table": [
     {
       "name": "h123_b0",
-      "config_hash": "9b7355d22f93",
+      "config_hash": "1fb1d67478f6",
       "status": "ok",
-      "rms_mmag": 5.709303051230193,
+      "rms_mmag": 5.735941871470128,
       "k": 15,
-      "n_common": 1044,
-      "bic": -475.8678670135526,
-      "delta_bic": 22.21763350605056,
+      "n_common": 1045,
+      "bic": -475.3856853128207,
+      "delta_bic": 22.60564636919719,
       "two_component": false
     },
     {
       "name": "h123_b1",
-      "config_hash": "6946d2c32b49",
+      "config_hash": "51e9f347c72c",
       "status": "ok",
-      "rms_mmag": 4.263568852464238,
+      "rms_mmag": 4.255295334272855,
       "k": 18,
-      "n_common": 1044,
-      "bic": -494.27152754317956,
-      "delta_bic": 3.8139729764235994,
+      "n_common": 1045,
+      "bic": -494.47272788397663,
+      "delta_bic": 3.5186037980412834,
       "two_component": false
     },
     {
       "name": "h23_b0",
-      "config_hash": "f4b101e8fbae",
+      "config_hash": "7d7c0f53544e",
       "status": "ok",
-      "rms_mmag": 5.7150966179211,
+      "rms_mmag": 5.748209902124409,
       "k": 14,
-      "n_common": 1044,
-      "bic": -479.71003779114125,
-      "delta_bic": 18.375462728461912,
+      "n_common": 1045,
+      "bic": -479.11160745220064,
+      "delta_bic": 18.87972422981727,
       "two_component": false
     },
     {
       "name": "h23_b1",
-      "config_hash": "23a51b25f432",
+      "config_hash": "77ded2e6c681",
       "status": "ok",
-      "rms_mmag": 4.269057325799285,
+      "rms_mmag": 4.272940139684816,
       "k": 17,
-      "n_common": 1044,
-      "bic": -498.08550051960316,
+      "n_common": 1045,
+      "bic": -497.9913316820179,
       "delta_bic": 0.0,
       "two_component": false
     }
@@ -105,10 +105,10 @@
   "ask_human": true,
   "reasons": [
     "eclipses are poorly resolved (1.9 points per FWHM)",
-    "h123_b1 is within 3.8 BIC of h23_b1 (decisive difference is 10)"
+    "h123_b1 is within 3.5 BIC of h23_b1 (decisive difference is 10)"
   ],
   "remarks": [],
   "n_eff": 51.79168640924314,
   "n_eff_measured": true,
-  "features_hash": "22894deb550a"
+  "features_hash": "fe3ee9f7a70b"
 }

@@ -22,7 +22,7 @@ from astropy.time import Time
 
 import mikulasek_eb as eb
 from mikulasek_eb.config import DataSetup, FitPolicy, ModelSpec
-from mikulasek_eb.exposure import estimate_exposure_days
+from mikulasek_eb.exposure import tess_exposure_days
 from mikulasek_eb.helpers import absolute_jd_to_mjd, predicted_magnitude
 from mikulasek_eb.io import load_tess_votable
 from mikulasek_eb.plotting import plot_global_fit
@@ -161,7 +161,7 @@ def main() -> None:
         data = DataSetup(
             baseline_order=BASELINE_ORDER,
             gap_split_days=GAP_SPLIT_DAYS,
-            exposure_days=estimate_exposure_days(t),
+            exposure_days=tess_exposure_days(t)[0],
         )
         out = eb.fit_borrowed(
             t, payload["mag"], payload["sig"], reference, data, plan, data_id=name

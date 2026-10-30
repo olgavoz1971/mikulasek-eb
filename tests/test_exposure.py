@@ -9,6 +9,7 @@ from mikulasek_eb import (
     EBModel,
     estimate_cadence_days,
     estimate_exposure_days,
+    tess_exposure_days,
     fit_global,
     phase,
     suggest_nsub,
@@ -119,9 +120,21 @@ def test_cadence_and_exposure_estimates():
 
 
 def test_suggest_nsub():
-    """The sub-step stays below a quarter of the FWHM, with a floor of five samples."""
-    assert suggest_nsub(10.0 / 1440.0, 0.05) == 5
-    assert suggest_nsub(10.0 / 1440.0, 0.0069) == 5
-    assert suggest_nsub(10.0 / 1440.0, 0.0028) == 10
+    """The sub-step stays below a quarter of the FWHM, with a floor of 21 samples."""
+    assert suggest_nsub(10.0 / 1440.0, 0.05) == 21
+    assert suggest_nsub(10.0 / 1440.0, 0.0069) == 21
+    assert suggest_nsub(10.0 / 1440.0, 0.0010) == 28
     with pytest.raises(ValueError):
         suggest_nsub(0.0, 0.01)
+
+
+def test_tess_exposure_is_80_percent_of_the_cadence_except_at_20_s():
+    """480 s at the 600 s cadence; the 20 s cadence has no cosmic-ray mitigation."""
+    for cadence, factor in ((600.0, 0.8), (120.0, 0.8), (1800.0, 0.8), (20.0, 1.0)):
+        t = np.arange(0.0, 2.0, cadence / 86400.0)
+        days, source = tess_exposure_days(t)
+        assert days * 86400.0 == pytest.approx(factor * cadence)
+        assert source.startswith("TESS")
+    with pytest.raises(ValueError, match="irregular"):
+        rng = np.random.default_rng(2)
+        tess_exposure_days(np.cumsum(rng.uniform(0.001, 0.05, 500)))

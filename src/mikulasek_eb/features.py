@@ -25,7 +25,7 @@ from scipy.signal import find_peaks
 
 from .api import validate_lightcurve
 from .errors import ConfigError, InvalidLightCurve
-from .exposure import estimate_cadence_days, estimate_exposure_days
+from .exposure import estimate_cadence_days, tess_exposure_days
 from .model import prof1
 from .solution import package_version, plain
 from .tuning import noise_floor
@@ -630,9 +630,9 @@ def extract_features(
     if exposure_days is not None:
         exposure_d, exposure_src = float(exposure_days), "user"
     else:
-        exposure_src = "estimated"
+        exposure_src = "unknown"
         try:
-            exposure_d = estimate_exposure_days(t)
+            exposure_d, exposure_src = tess_exposure_days(t)
         except ValueError as ex:
             exposure_d = none("exposure_s", str(ex))
     dt = np.diff(t)
