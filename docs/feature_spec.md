@@ -139,3 +139,19 @@ First results (`examples/features_table.py`, `results/features_summary.md`), to 
 - `gamma_estimate` for the two-component AA And profile does not match profile 1 (distance 0.26), which is the expected warning.
 - XY Boo S50: both eclipses are measured; primary centre moves by -51 +- 12 s between the two halves of the sector while the secondary moves by +9 +- 12 s. Opposite behaviour of the two minima is the signature of spots, not of a period change; a period change would move both the same way. This is an observation, not a conclusion. The 10-min data can detect shifts of about 10 s at one sigma.
 - Questions 1 and 2 of section 7 stay open and are now `FeatureSettings` fields.
+
+## 9. Window and contact calibration (2026-10-30)
+
+Problem found in section 8: windows of 1.5 FWHM were an arbitrary size and the contact indicator mislabelled the stars. Looking at the folds of the seven light curves showed what actually separates them.
+
+Folds (see `results/features_summary.md`): only AR Aur has a flat stretch between narrow eclipses. AA And, AV Del, EK Com and XY Boo vary continuously; V477 Lyr is one eclipse on a strong reflection-like variation with no real secondary. Earlier I called AA And "detached with flat maxima"; its fold does not show that, so the first indicator was not wrong about it.
+
+Changes (`FeatureSettings`):
+- **Eclipse edge.** `edge_level` (0.05): the eclipse edge is where the eclipse has fallen to 5 percent of its depth. `edge_width1`, `edge_width2` are the full widths there, in cycles. The window of each eclipse is `window_margin` (1.0) times that width. An eclipse whose edge is not reached within half a cycle fills the cycle (a note says so).
+- **Separated eclipses.** `eclipse_coverage` (the fraction of the cycle inside the windows) below `separated_coverage` (0.3). `continuous_variation` is its negation.
+- **Contact candidate.** Not separated and `equal_depths` (A2 / A1 at least 0.8). Reasoning: contact components have nearly equal temperatures, so equal depths; AA And and AV Del have depths in ratio 0.26 and 0.28, EK Com and XY Boo 0.90 and 0.93. `contact_candidate` is None if there is no secondary.
+- Removed `window_fwhm`, `contact_fwhm`, `contact_coverage`.
+
+Results at `edge_level` 0.05: coverage AR Aur 0.11; AV Del 0.62; AA And 0.71; EK Com 0.76; XY Boo 0.80. Contact candidate: EK Com and XY Boo only. The ordering is the same for edge levels 0.02, 0.05, 0.1 (tested); at 0.2 AV Del drops to 0.33, close to the 0.3 threshold.
+
+Limits (honest): one star on the separated side, so the 0.3 threshold is only placed in the gap (0.11 to 0.62) and the 0.8 depth ratio in the gap (0.28 to 0.90). Another star (a detached twin with equal depths, e.g. AR Aur itself has A2/A1 = 0.86 but is separated) is handled by the coverage test first. A semi-detached system with a flat stretch and unequal depths would be "separated, not contact", which is what we want. I have no star yet that tests the boundary. The labels are my reading of the folds, not a catalogue classification.

@@ -94,7 +94,7 @@ Reason for doing this first: the paper comparison must rest on an engine that do
 - Use cases to keep in mind: host application on a remote server (stateless, cacheable, JSON), local scripts, Jupyter notebooks, analysis with an agent; not only TESS data.
 
 ### Phase 4: automatic profile selection
-- [x] `features.py`: `extract_features`, `Features`, `FeatureSettings`; features in timing headers (EK Com script); `examples/features_table.py`; tests in `tests/test_features.py`. First results in `docs/feature_spec.md` section 8. Open: calibrate windows and thresholds on the stars (contact indicator says contact for AA And; `trend_order_hint` always 3), hypothesis rules, evidence stage.
+- [x] `features.py`: `extract_features`, `Features`, `FeatureSettings`; features in timing headers (EK Com script); `examples/features_table.py`; tests in `tests/test_features.py`. First results in `docs/feature_spec.md` section 8. Windows and contact indicator calibrated (spec section 9: edge-based windows, `separated_eclipses`, `contact_candidate`). Open: `trend_order_hint` always 3, hypothesis rules, evidence stage, a star near the contact boundary.
 - [x] Feature spec drafted: `docs/feature_spec.md` (features A to F, draft rules, evidence stage, test stars incl. XY Boo S50). 
 - [ ] Light-curve analysis features from the fold (depths, widths, flatness, out-of-eclipse curvature, reflection effect, secondary phase check).
 - [ ] Hypothesis tree: detached, contact, semi-detached, reflection, eccentric flag.
@@ -126,3 +126,4 @@ Reason for doing this first: the paper comparison must rest on an engine that do
 - 2026-10-30: per-star scripts save config and solution JSON. Sector 17 handling and joint ephemeris postponed by the developer. Next: Phase 4 discussion.
 - 2026-10-30: XY Boo (TIC 347405567, S50, 10-min) added to `data/`; feature spec drafted.
 - 2026-10-30: features implemented and run on all seven light curves.
+- 2026-10-30: eclipse windows now edge-based; contact indicator replaced by separated_eclipses plus contact_candidate.

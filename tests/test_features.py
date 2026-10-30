@@ -9,7 +9,6 @@ import pytest
 
 import mikulasek_eb as eb
 from mikulasek_eb.errors import InvalidLightCurve
-from mikulasek_eb.features import gamma_from_width_ratios
 from mikulasek_eb.helpers import absolute_jd_to_mjd
 from mikulasek_eb.io import load_tess_votable
 from mikulasek_eb.model import EBModel, phase
@@ -49,7 +48,8 @@ def test_synthetic_geometry_and_shape_match_the_model():
     # With harmonics the widths are measured on a curved baseline, so Gamma is biased
     # (1.45 here against 2.0 true); check the estimator on the pure profile below.
     assert f.shape["gamma_estimate"] is not None
-    assert f.variation["continuous_variation"] is False
+    # (the 5 percent edge, 22 mmag here, is as small as the 20 mmag harmonic, so the
+    # separation of eclipses is tested on the pure profile below)
     md = f.variation["maxima_difference"]
     expected = model(np.array([0.25]), TRUE) - model(np.array([0.75]), TRUE)
     assert md["value"] == pytest.approx(float(expected[0]), abs=5 * md["err"])
@@ -68,6 +68,7 @@ def test_gamma_estimate_recovers_the_pure_profile():
         f = eb.extract_features(t, y, np.full(len(t), 0.002), P, 2458000.7)
         assert f.shape["gamma_estimate"] == pytest.approx(gamma, rel=0.15)
         assert f.shape["gamma_match_distance"] < 0.05
+        assert f.variation["separated_eclipses"] is True
 
 
 def test_period_error_shows_up_as_a_drift_between_halves():
@@ -125,27 +126,55 @@ def _load(name):
 
 
 @pytest.mark.parametrize(
-    "name,contact",
+    "name,separated,contact_candidate",
     [
-        (
-            "lc_discovery_TIC_455790537_SPOC_sector_16",
-            True,
-        ),  # AA And: wide eclipses, see note
-        ("EK_Com_sector_49", True),
-        ("lc_discovery_TIC_347405567_TESS_SPOC_sector_50", True),
-        ("AR_Aur_sector_19", False),
-        ("AV_Del_sector_81", False),
+        ("lc_discovery_TIC_455790537_SPOC_sector_16", False, False),  # AA And
+        ("lc_discovery_TIC_455790537_TESS_SPOC_sector_16", False, False),
+        ("EK_Com_sector_49", False, True),
+        ("lc_discovery_TIC_347405567_TESS_SPOC_sector_50", False, True),  # XY Boo
+        ("AV_Del_sector_81", False, False),
+        ("AR_Aur_sector_19", True, False),
     ],
 )
-def test_real_stars_branch(name, contact):
-    """The contact/detached indicator matches what we know of the star's character."""
+def test_real_stars_eclipse_character(name, separated, contact_candidate):
+    """Separated eclipses and the contact candidate follow what the folds show.
+
+    AR Aur has a flat stretch between narrow eclipses; AA And and AV Del have unequal
+    depths with continuous variation; EK Com and XY Boo have equal depths and no flat
+    stretch. Calibrated on these stars only (see docs/feature_spec.md).
+    """
     p, t = _load(name)
     f = eb.extract_features(t, p["mag"], p["sig"], p["period"], p["epoch_jd"])
-    if name.startswith("lc_discovery_TIC_455790537"):
-        # AA And has total eclipses and wide ones; eclipse coverage 0.93 is above 0.9
-        assert f.variation["continuous_variation"] is True
-        return
-    assert f.variation["continuous_variation"] is contact
+    v = f.variation
+    assert v["separated_eclipses"] is separated
+    assert v["contact_candidate"] is contact_candidate
+
+
+def test_edge_level_does_not_change_the_ordering():
+    """AR Aur stays separated and the others stay continuous for edge levels 0.02 to 0.1."""
+    for level in (0.02, 0.05, 0.1):
+        st = eb.FeatureSettings(edge_level=level)
+        cov = {}
+        for name in ("AR_Aur_sector_19", "AV_Del_sector_81", "EK_Com_sector_49"):
+            p, t = _load(name)
+            f = eb.extract_features(
+                t, p["mag"], p["sig"], p["period"], p["epoch_jd"], st
+            )
+            cov[name] = f.variation["eclipse_coverage"]
+        assert (
+            cov["AR_Aur_sector_19"]
+            < 0.3
+            < cov["AV_Del_sector_81"]
+            < cov["EK_Com_sector_49"]
+        )
+
+
+def test_no_secondary_leaves_the_branch_undecided():
+    """V477 Lyr has no secondary eclipse: the contact candidate is None with a note."""
+    p, t = _load("v477_Lyr_sector_26")
+    f = eb.extract_features(t, p["mag"], p["sig"], p["period"], p["epoch_jd"])
+    assert f.variation["contact_candidate"] is None
+    assert any(n.startswith("A2:") for n in f.notes)
 
 
 def test_real_xy_boo_ephemeris_features_are_finite():

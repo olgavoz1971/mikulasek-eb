@@ -51,10 +51,13 @@ class FeatureSettings:
         vertex_core_frac (float): Bins deeper than this fraction of the depth enter the
             parabola that gives the eclipse centre.
         bottom_core_frac (float): Same, for the bottom curvature feature.
-        window_fwhm (float): Half-width of the eclipse windows in units of the FWHM.
+        edge_level (float): The eclipse edge is where the eclipse is this fraction of its
+            depth (0.05 means the eclipse has fallen to 5 percent of its depth).
+        window_margin (float): Eclipse window half-width = margin times half the edge width.
         flat_bottom_ratio (float): ``bottom_ratio`` above this suggests a flat bottom.
-        contact_fwhm (float): Primary FWHM (cycles) above this suggests a contact system.
-        contact_coverage (float): Eclipse-window coverage above this suggests contact.
+        separated_coverage (float): The eclipses are separated (a flat stretch exists between
+            them) if the windows cover less than this fraction of the cycle.
+        equal_depth_ratio (float): Depths are called equal if A2 / A1 is at least this.
         harmonics_max (int): Highest harmonic of the out-of-eclipse fit.
         gap_days (float): Gaps longer than this split the baseline segments.
         trend_max_order (int): Highest polynomial degree tried per segment.
@@ -70,10 +73,11 @@ class FeatureSettings:
     core_halfmax: float = 0.25
     vertex_core_frac: float = 0.8
     bottom_core_frac: float = 0.9
-    window_fwhm: float = 1.5
+    edge_level: float = 0.05
+    window_margin: float = 1.0
     flat_bottom_ratio: float = 0.6
-    contact_fwhm: float = 0.2
-    contact_coverage: float = 0.9
+    separated_coverage: float = 0.3
+    equal_depth_ratio: float = 0.8
     harmonics_max: int = 4
     gap_days: float = 0.5
     trend_max_order: int = 3
@@ -648,27 +652,33 @@ def extract_features(
     # --- D: out-of-eclipse variation
     grid = np.linspace(0.0, 1.0, 2000, endpoint=False)
     coverage = ooe_ratio = harmonics = None
-    if fw1 is not None and fw2 is not None:
-        inside = (np.abs(_dphi(grid, 0.0)) < st.window_fwhm * fw1) | (
-            np.abs(_dphi(grid, sec_centre)) < st.window_fwhm * fw2
+    edge1 = _width(fold, 0.0, level + st.edge_level * A1)
+    edge2 = None if A2 is None else _width(fold, sec_centre, level + st.edge_level * A2)
+    if A2 is not None:
+        # an eclipse whose edge is not reached within half a cycle fills the cycle
+        half1 = 0.5 if edge1 is None else st.window_margin * edge1 / 2
+        half2 = 0.5 if edge2 is None else st.window_margin * edge2 / 2
+        for nm, e in (("edge_width1", edge1), ("edge_width2", edge2)):
+            if e is None:
+                notes.append(
+                    f"{nm}: eclipse does not fall to {st.edge_level:.0%} of its depth "
+                    f"within half a cycle; its window is taken as the whole cycle"
+                )
+        inside = (np.abs(_dphi(grid, 0.0)) < half1) | (
+            np.abs(_dphi(grid, sec_centre)) < half2
         )
         coverage = float(inside.mean())
-        if coverage < 1 - 20 / len(grid):
-            free = grid[~inside]
-            if len(free) >= 0.05 * len(grid):
-                yy = fold.at(free)
-                ooe_ratio = float(np.ptp(yy) / A1)
-            else:
-                none(
-                    "ooe_amplitude_over_depth",
-                    "eclipse windows cover over 95% of the cycle",
-                )
+        free = grid[~inside]
+        if len(free) >= 0.05 * len(grid):
+            ooe_ratio = float(np.ptp(fold.at(free)) / A1)
         else:
-            none("ooe_amplitude_over_depth", "eclipse windows cover the whole cycle")
-        # harmonics from filled bins outside the windows
+            none(
+                "ooe_amplitude_over_depth",
+                f"eclipse windows cover {coverage:.0%} of the cycle (need at most 95%)",
+            )
         d1 = np.abs(_dphi(fold.centres, 0.0))
         d2 = np.abs(_dphi(fold.centres, sec_centre))
-        use = fold.ok & (d1 >= st.window_fwhm * fw1) & (d2 >= st.window_fwhm * fw2)
+        use = fold.ok & (d1 >= half1) & (d2 >= half2)
         K = st.harmonics_max
         if use.sum() >= 2 * (2 * K + 1):
             th = 2 * np.pi * fold.centres[use]
@@ -689,10 +699,12 @@ def extract_features(
         else:
             none("harmonic_amplitudes", "too few bins outside the eclipse windows")
     else:
-        none("coverage", "eclipse widths not measurable")
-    continuous = None
-    if coverage is not None and fw1 is not None:
-        continuous = bool(coverage >= st.contact_coverage or fw1 > st.contact_fwhm)
+        none("eclipse_coverage", "no secondary eclipse, windows not defined")
+    separated = None if coverage is None else bool(coverage < st.separated_coverage)
+    equal_depths = None if A2 is None else bool(A2 / A1 >= st.equal_depth_ratio)
+    contact_candidate = (
+        None if separated is None else bool(not separated and equal_depths)
+    )
     hw = st.reference_halfwidth
     q = []
     for ph0 in (0.25, 0.75):
@@ -705,7 +717,12 @@ def extract_features(
     variation = dict(
         eclipse_coverage=coverage,
         ooe_amplitude_over_depth=ooe_ratio,
-        continuous_variation=continuous,
+        edge_width1=edge1,
+        edge_width2=edge2,
+        separated_eclipses=separated,
+        continuous_variation=None if separated is None else not separated,
+        equal_depths=equal_depths,
+        contact_candidate=contact_candidate,
         maxima_difference=dict(value=mdiff, err=merr),
         maxima_significance=float(abs(mdiff) / merr),
         harmonic_amplitudes=harmonics,

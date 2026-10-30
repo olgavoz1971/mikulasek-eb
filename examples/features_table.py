@@ -76,7 +76,7 @@ def main() -> None:
                 fmt(sh["wing_ratio"]),
                 fmt(sh["gamma_estimate"]),
                 fmt(v["eclipse_coverage"]),
-                fmt(v["continuous_variation"]),
+                fmt(v["contact_candidate"]),
                 f"{1e3 * md['value']:.1f} ({fmt(v['maxima_significance'], 2)} sigma)",
                 shift("primary"),
                 shift("secondary"),
