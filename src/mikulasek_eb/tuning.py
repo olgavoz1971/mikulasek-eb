@@ -338,7 +338,7 @@ def wall_band(model, p, frac=(0.9, 0.1)):
         q[f"A{other}"] = 0.0
         if f"A{other}b" in q:
             q[f"A{other}b"] = 0.0
-        F = model(c + g, q)
+        F = model.intrinsic()(c + g, q)
         F = F / F[0]
         i_lo = int(np.argmax(F < frac[0]))
         i_hi = int(np.argmax(F < frac[1])) if np.any(F < frac[1]) else len(g) - 1

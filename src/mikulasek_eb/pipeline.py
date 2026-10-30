@@ -30,6 +30,7 @@ from .extensions import (
     two_component_degenerate,
 )
 from .helpers import complete_template, out_of_eclipse_phase_mask, report_fit
+from .exposure import suggest_nsub
 from .fit import fit_global
 
 logger = logging.getLogger(__name__)
@@ -66,6 +67,11 @@ class FitConfig:
             sigma only. Must be agreed by the researcher; not a silent default.
         eclipse_phase_half (float): Phase half-width around 0 and 0.5 for
             that extra weight (cycles).
+        exposure_days (float | None): Exposure time (days) for exposure integration of
+            the model (extension, not in the paper). None means instantaneous samples.
+            See ``exposure.estimate_exposure_days`` for a cadence-based estimate.
+        exposure_nsub (int | None): Sub-exposure samples; None chooses it from the
+            exposure and the folded FWHM (``exposure.suggest_nsub``).
     """
 
     profile: int
@@ -80,6 +86,8 @@ class FitConfig:
     rms_noise_two_comp_threshold: float = 1.5
     eclipse_weight: float = 1.0
     eclipse_phase_half: float = 0.12
+    exposure_days: float | None = None
+    exposure_nsub: int | None = None
 
 
 @dataclass
@@ -222,7 +230,7 @@ def run_staged_fit(
     if fwhm_d / cadence_d < MIN_POINTS_PER_FWHM:
         logger.warning(
             "Fewer than %.0f points per FWHM; contacts may be exposure-smeared "
-            "and D biased wide (no supersampling in this engine).",
+            "and D biased wide (set FitConfig.exposure_days to integrate over the exposure).",
             MIN_POINTS_PER_FWHM,
         )
     if g["A2"] < 0:
@@ -234,9 +242,25 @@ def run_staged_fit(
             "A1 is not much deeper than A2; period may be P/2. Continuing with given P."
         )
 
-    model = EBModel(
-        profile=config.profile, harmonics=config.harmonics, ocon=config.ocon
-    )
+    if config.exposure_days is None:
+        model = EBModel(
+            profile=config.profile, harmonics=config.harmonics, ocon=config.ocon
+        )
+    else:
+        nsub = config.exposure_nsub or suggest_nsub(config.exposure_days, fwhm_d)
+        logger.info(
+            "exposure integration: %.1f s in %d sub-samples",
+            86400.0 * config.exposure_days,
+            nsub,
+        )
+        model = EBModel(
+            profile=config.profile,
+            harmonics=config.harmonics,
+            ocon=config.ocon,
+            exposure_days=config.exposure_days,
+            nsub=nsub,
+            period_days=period_days,
+        )
     hnames = _harmonic_free_names(model)
     p0 = complete_template(
         dict(A1=g["A1"], A2=g["A2"], D1=D_from_fwhm(g["fwhm"], 1.0), G1=1.0),

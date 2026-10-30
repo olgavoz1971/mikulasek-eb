@@ -51,6 +51,7 @@ from .model import (
     prof6,
     prof7,
 )
+from .exposure import estimate_cadence_days, estimate_exposure_days, suggest_nsub
 from .fit import (
     FitResult,
     FitDidNotConverge,
@@ -96,6 +97,9 @@ from .io import load_tess_votable
 from .helpers import absolute_jd_to_mjd
 
 __all__ = [
+    "estimate_cadence_days",
+    "estimate_exposure_days",
+    "suggest_nsub",
     "PROFILES",
     "EBModel",
     "phase",

@@ -70,7 +70,7 @@ Reason for doing this first: the paper comparison must rest on an engine that do
 ### Phase 3b: paper completeness (before Phase 4, agreed 2026-10-30)
 - [x] Table 2 #1 to #4 verified against the printed table (page 8); #5 (Gaussian), #6 (triangle, half-width D), #7 (exp(1 - cosh)) added with `PROFILE_SHAPE` (which of D, G, C each profile uses). Tests in `tests/test_profiles.py` (Table 2 relations, fit recovery). Pipeline guard: `run_staged_fit` raises for profiles 5 to 7; generalising it belongs to Phase 4.
 - [x] Eq. 14 K term: `EBModel(profile=1, kterm=True)`, keys `K1` (optional `K2`), off by default; synthetic transit test recovers K. Not yet in `FitConfig` or the pipeline (Phase 4 / exoplanet use), `wall_band` works through the model.
-- [ ] Exposure-time integration of the model (not in the paper): supersample over the exposure; first test on EK Com (10 min, about 5.6 points per FWHM) to see how much of the ~20 mmag wall residual it explains; later an automatic switch on cadence / FWHM.
+- [x] Exposure-time integration (not in the paper; it is model averaging over the exposure, i.e. time-binning of the model): `EBModel(exposure_days, nsub, period_days)`, `FitConfig(exposure_days, exposure_nsub)`, helpers in `exposure.py` (`estimate_cadence_days`, `estimate_exposure_days`, `suggest_nsub`), tests `tests/test_exposure.py`. EK Com: rms 5.89 / 5.90 / 5.91 mmag for none / 0.8 / 1.0 x cadence, so the ~20 mmag wall residuals are NOT exposure smearing; D and Gamma move to 0.0523 and 1.72 (paper 0.052, 1.7). TODO for volightcurve: a public method returning the exposure time when the data carry it (noted in `exposure.py`). Still open: automatic switch on cadence / FWHM (Phase 4), exposure in timing files header.
 
 ### Deferred (decided 2026-10-30, revisit when needed)
 - Multicolour model, Eq. 16 (Lambda dependence a_k1 + a_k2 Lambda) with per-instrument instrumental terms (Eq. 10): when multi-band data arrive; also for a proper V477 Lyr band test.
@@ -80,6 +80,7 @@ Reason for doing this first: the paper comparison must rest on an engine that do
 - Eclipse asymmetry term (AV Del out-of-eclipse asymmetry of about 15 mmag).
 - One place for configuration (`FitConfig` or successor): constants spread over `tom`, `extensions`, `pipeline`; settle before Phase 4 output format.
 - Open validation items: V477 Lyr Gamma (1.28 against 0.79, band hypothesis untested), EK Com C2 (2.2 sigma), Table 1 AR Aur period erratum candidate (to tell Z. Mikulasek), XY Boo, `ebfit`, MAVKA comparison.
+- volightcurve: request a public method that returns the exposure time of a light curve if the data have it (no VOTable standard); then read it in `mikulasek_eb.io`.
 - Local-continuum measurement of the secondary depth in `initial_guess` (bright-secondary case), part of Phase 4 feature extraction.
 - Write to Z. Mikulasek with the results (developer).
 
@@ -107,3 +108,4 @@ Reason for doing this first: the paper comparison must rest on an engine that do
 - 2026-10-30: Phase 3 first pass: package `mikulasek_eb` under `src/` (old `scripts/` engine and `working_scripts` library modules split into modules and removed; `examples/` holds the two CLI examples). 23 tests pass, EK Com timings 70/68 unchanged. Open: editable install (`pip install -e .`, developer to run), one configuration place, folder rename `mikulasek_eb_2`, stray `mikulasek-eb-fitting.skill`, untracked `mikulasek_eb/` and `mikulasek_eb2.back/` at the repo root (not touched).
 - 2026-10-30: Package moved to its own repository (/home/voz/projects/UPJS/mikulasek_eb, GitHub olgavoz1971/mikulasek-eb), black applied, README added, 23 tests pass. Folder rename and the editable-install note are obsolete. Still open: one configuration place; stray `.skill` file left behind in skvo_veb_2 history only.
 - 2026-10-30: Agreed order before Phase 4: Phase 3b (profiles check and #5 to #7, K term, exposure-time integration); the rest is listed under Deferred.
+- 2026-10-30: Phase 3b finished: Table 2 #5 to #7, K term, exposure integration. EK Com wall residuals are not exposure smearing (rms unchanged), so the cause stays open (single Gamma ceiling, spots, band). Next: Phase 4, after your decision on configuration design.

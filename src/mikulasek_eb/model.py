@@ -181,9 +181,24 @@ class EBModel:
         harmonics (tuple): Orders k of the cosine terms.
         ocon (bool): Whether the O'Connell sine term S1 is included.
         kterm (bool): Whether the Eq. (14) quartic term K is used (profile 1 only).
+        exposure_days (float or None): Exposure time (days) over which the model is
+            averaged (EXTENSION, not in the paper); None means instantaneous.
+        nsub (int): Number of sub-exposure samples (midpoint rule) per exposure.
+        period_days (float or None): Period (days) that converts the exposure to phase.
+            It is fixed during a fit; the fitted period changes it by a negligible relative
+            amount (of the order of the relative period change).
     """
 
-    def __init__(self, profile=1, harmonics=(2,), ocon=False, kterm=False):
+    def __init__(
+        self,
+        profile=1,
+        harmonics=(2,),
+        ocon=False,
+        kterm=False,
+        exposure_days=None,
+        nsub=5,
+        period_days=None,
+    ):
         """Store the model configuration.
 
         Args:
@@ -191,9 +206,16 @@ class EBModel:
             harmonics (tuple of int): Orders of the cosine terms H_k.
             ocon (bool): Include the O'Connell sine term S1.
             kterm (bool): Use the Eq. (14) quartic term K (profile 1 only).
+            exposure_days (float or None): Exposure time (days). If given, the model is
+                the mean over the exposure (a boxcar of this width in time), which is what
+                an integrating detector records. None means instantaneous samples.
+            nsub (int): Sub-exposure samples per exposure (see ``exposure.suggest_nsub``).
+            period_days (float or None): Period (days) used to convert the exposure to
+                phase; required with ``exposure_days``.
 
         Raises:
-            ValueError: If ``profile`` is not 1 to 7, or ``kterm`` is used with another profile.
+            ValueError: If ``profile`` is not 1 to 7, ``kterm`` is used with another
+                profile, or the exposure settings are inconsistent.
         """
         if profile not in PROFILES:
             raise ValueError(f"Unknown Table 2 profile {profile!r}; use 1 to 7.")
@@ -201,6 +223,31 @@ class EBModel:
             raise ValueError("The K term (Eq. 14) is defined for profile 1 only.")
         self.profile, self.harmonics, self.ocon = profile, tuple(harmonics), ocon
         self.kterm = bool(kterm)
+        if exposure_days is None:
+            if period_days is not None:
+                raise ValueError(
+                    "period_days is only used together with exposure_days."
+                )
+        else:
+            if not exposure_days > 0:
+                raise ValueError(
+                    f"exposure_days must be positive, got {exposure_days!r}."
+                )
+            if period_days is None or not period_days > 0:
+                raise ValueError("exposure_days requires a positive period_days.")
+            if int(nsub) != nsub or nsub < 1:
+                raise ValueError(f"nsub must be a positive integer, got {nsub!r}.")
+        self.exposure_days = exposure_days
+        self.nsub = int(nsub)
+        self.period_days = period_days
+
+    def intrinsic(self):
+        """Copy of the model without exposure integration (the instantaneous profile).
+
+        Returns:
+            EBModel: Same profile, harmonics, O'Connell and K settings, no exposure.
+        """
+        return EBModel(self.profile, self.harmonics, self.ocon, self.kterm)
 
     def names(self, shared_shape=True):
         """Names of the template parameters that can be fitted.
@@ -230,6 +277,25 @@ class EBModel:
             ndarray: Magnitude relative to the out-of-eclipse level.
         """
         theta = np.asarray(theta, float)
+        if self.exposure_days is None or self.nsub == 1:
+            return self._instantaneous(theta, p)
+        half = 0.5 * self.exposure_days / self.period_days
+        offsets = (2.0 * (np.arange(self.nsub) + 0.5) / self.nsub - 1.0) * half
+        total = np.zeros_like(theta)
+        for off in offsets:
+            total += self._instantaneous(theta + off, p)
+        return total / self.nsub
+
+    def _instantaneous(self, theta, p):
+        """Evaluate the model at instantaneous phases (no exposure averaging).
+
+        Args:
+            theta (ndarray): Phase (cycles).
+            p (dict): Parameters, see the class docstring.
+
+        Returns:
+            ndarray: Magnitude relative to the out-of-eclipse level.
+        """
         prof = PROFILES[self.profile]
         F = np.zeros_like(theta)
         for k in (1, 2):

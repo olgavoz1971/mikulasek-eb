@@ -59,6 +59,13 @@
   - The skill requires four acceptance checks before adopting it.
 - **The paper's own remedy (found on re-reading).** Sect. 4.1.1: "in EBs with totalities we see that the bottoms of their occultations are flat whilst transits are convex. It can be described by introducing different parameters C1, C2 (see the case of EK Com in Table 1, Fig. 2)". So the first step for a flat bottom is separate C1 and C2, before this extension. The TESS EK Com fit with separate C1 and C2 lowers the rms from 8.5 to 6.2 mmag (section 7) but about 20 mmag residuals stay on the primary walls, so the extension is not made redundant by it. Whether the author has published a further remedy is still open.
 
+### 2.1b Exposure-time integration ➕ (2026-10-30)
+- **What.** `EBModel(exposure_days=..., nsub=..., period_days=...)` averages the model over the exposure (a boxcar in time, midpoint rule with `nsub` samples). `FitConfig(exposure_days=..., exposure_nsub=...)` passes it to the pipeline. `mikulasek_eb.exposure` has `estimate_cadence_days`, `estimate_exposure_days(t, duty_cycle)` and `suggest_nsub(exposure, fwhm)` (at least 5 samples, sub-step below a quarter of the FWHM).
+- **Why.** Narrow eclipses on a long cadence are smeared; without integration D is biased wide. Synthetic test: only the integrating fit recovers D.
+- **Exposure value.** There is no standard annotation for it in VOTable time series, so it is a user parameter or a cadence-based estimate (duty cycle 1 is the upper limit; TESS integrates for less than the cadence). TODO in `exposure.py`: ask for a public `volightcurve` method that returns the exposure time when the data carry it.
+- **EK Com (sector 49, 10 min), pipeline fit, C1 = 0:** rms 5.89 mmag without integration, 5.90 with exposure 0.8 x cadence and 5.91 with 1.0 x cadence. The ~20 mmag wall residuals are therefore **not** explained by exposure smearing (hypothesis refuted). D moves from 0.0533 to 0.0523 and Gamma from 1.63 to 1.72 (paper 0.052 and 1.7), which may be a coincidence because the fit quality does not improve.
+- **Approximation.** The exposure is converted to phase with a fixed reference period (the fitted period changes by a negligible relative amount); Pdot is ignored in that conversion.
+
 ### 2.2 Timing-mode additions ➕
 - **Windowed local mode.** Fit only |ϑ − E| < `window` (window 0.25 = whole phase). The motivation was robustness to changing shape.
 - **Optional per-event scales** of depth, width and kurtosis (`free=("A","D","G")`). Unstable in windows below 0.1 in my tests.
@@ -109,7 +116,6 @@ K gives little in this idealised test.
 | **Multicolour model** (Eq. 16, Λ = λ₀/λ<sub>eff</sub> − 1; a<sub>k1</sub> + a<sub>k2</sub>Λ in Eq. 18) | For joint TESS + ground-based multiband fits. |
 | Baseline alternatives: Legendre or quasi-orthogonal polynomial-harmonic functions (Eq. 11); weighted normalisation | Long segments with strong instrumental trends. |
 | Joint solution with **radial velocities** (Eq. 19) and published minima times; hybrid Model II (template from a physical code) | Combined analyses as for XY Boo. |
-| **Exposure-time integration** of the model | Not in the paper. My own gap: with a long cadence on narrow eclipses D is biased wide. |
 | **Eclipse asymmetry** parameter | Not in the paper. My own gap. |
 | Validation against the paper's examples | Done for the four one-star columns of Table 1 (section 7). Not done for XY Boo, `ebfit`, MAVKA. |
 
