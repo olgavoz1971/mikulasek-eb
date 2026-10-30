@@ -185,6 +185,7 @@ def _two_component_timing_ok(
     model: EBModel,
     r_single,
     r_two,
+    sigma_max: float,
 ) -> tuple[bool, str]:
     """Compare both-walls virtual minima for single- vs two-component templates.
 
@@ -195,6 +196,7 @@ def _two_component_timing_ok(
         model (EBModel): Phenomenological model.
         r_single: Single-component ``FitResult``.
         r_two: Two-component ``FitResult``.
+        sigma_max (float): Largest accepted median |dT| / combined sigma.
 
     Returns:
         tuple[bool, str]: ``timing_ok`` and a log line for check 4.
@@ -244,25 +246,5 @@ def _two_component_timing_ok(
         f"rms dt={86400.0 * d_t.std():.1f} s "
         f"median |dt|/comb.sigma={med_ratio:.2f}"
     )
-    timing_ok = med_ratio <= TIMING_AGREEMENT_SIGMA_MAX
+    timing_ok = med_ratio <= sigma_max
     return timing_ok, msg
-
-
-# Two-component acceptance (shape): fractional rms improvement.
-MIN_RMS_GAIN_FRAC = 0.25
-
-
-# Two-component acceptance: agreeing refine_two_component starts at best chi2.
-MIN_AGREEING_TWO_COMP_STARTS = 2
-
-
-# Two-component acceptance: max relative error on A1, D1, G1, A1b, D1b, G1b.
-MAX_TWO_COMP_REL_ERR = 0.5
-
-
-# Eclipse index for the optional second profile component (extension, not Mikulasek 2015).
-TWO_COMP_ECLIPSES = (1,)
-
-
-# Median |delta T| / combined sigma must be at most this for timing_ok.
-TIMING_AGREEMENT_SIGMA_MAX = 1.0

@@ -84,9 +84,19 @@ from .tuning import (
     oc_diagnostics,
 )
 from .extensions import refine_two_component, eclipse_reweighted_sigma
-from .pipeline import FitConfig, FitPipelineResult, run_staged_fit
+from .config import (
+    Config,
+    ConfigError,
+    DataSetup,
+    FitConfig,
+    FitPolicy,
+    ModelSpec,
+    TimingRecipe,
+)
+from .pipeline import FitPipelineResult, run_staged_fit
 from .tom import (
     time_both_walls,
+    time_with_recipe,
     write_timing_ascii,
     select_eclipses,
     clean_timings,
@@ -97,6 +107,12 @@ from .io import load_tess_votable
 from .helpers import absolute_jd_to_mjd
 
 __all__ = [
+    "Config",
+    "ConfigError",
+    "DataSetup",
+    "FitPolicy",
+    "ModelSpec",
+    "TimingRecipe",
     "estimate_cadence_days",
     "estimate_exposure_days",
     "suggest_nsub",
@@ -143,6 +159,7 @@ __all__ = [
     "FitPipelineResult",
     "run_staged_fit",
     "time_both_walls",
+    "time_with_recipe",
     "write_timing_ascii",
     "select_eclipses",
     "clean_timings",

@@ -18,10 +18,6 @@ from .tuning import (
 )
 from .model import EBModel
 from .extensions import (
-    MAX_TWO_COMP_REL_ERR,
-    MIN_AGREEING_TWO_COMP_STARTS,
-    MIN_RMS_GAIN_FRAC,
-    TWO_COMP_ECLIPSES,
     _fold_phase_from_t0,
     _mjd_to_jd,
     _two_component_timing_ok,
@@ -30,64 +26,11 @@ from .extensions import (
     two_component_degenerate,
 )
 from .helpers import complete_template, out_of_eclipse_phase_mask, report_fit
+from .config import Config, FitConfig
 from .exposure import suggest_nsub
 from .fit import fit_global
 
 logger = logging.getLogger(__name__)
-
-
-# Folded depth ratio below which we warn that P might be P/2.
-PRIMARY_A2_OVER_A1_MIN_RATIO = 1.2
-
-
-# Cadence warning: fewer than this many samples per FWHM (FFI / long cadence).
-MIN_POINTS_PER_FWHM = 8.0
-
-
-@dataclass
-class FitConfig:
-    """Star-specific phenomenological and baseline choices.
-
-    Attributes:
-        profile (int): Mikulasek Table 2 profile index.
-        harmonics (tuple[int, ...]): Cosine harmonic orders (H_k).
-        ocon (bool): If True, include O'Connell sine S1.
-        baseline_order (int): Per-segment polynomial degree.
-        gap_split_days (float | None): Split baselines on gaps longer than this
-            (days). None means one baseline for the whole series.
-        gamma_starts (tuple): Multi-start Gamma values.
-        separate_shape_chi2_frac (float): Unlock D2/G2 if chi2 drops by more.
-        clip_nsig (float): Out-of-eclipse MAD clip threshold.
-        allow_two_component (bool): Whether to try A1b/D1b/G1b after a poor
-            single-component rms/noise.
-        rms_noise_two_comp_threshold (float): Try two-component above this
-            rms/noise ratio.
-        eclipse_weight (float): Extra least-squares weight in both eclipse
-            windows (``sigma_eff = sigma / weight``). 1.0 means catalogue
-            sigma only. Must be agreed by the researcher; not a silent default.
-        eclipse_phase_half (float): Phase half-width around 0 and 0.5 for
-            that extra weight (cycles).
-        exposure_days (float | None): Exposure time (days) for exposure integration of
-            the model (extension, not in the paper). None means instantaneous samples.
-            See ``exposure.estimate_exposure_days`` for a cadence-based estimate.
-        exposure_nsub (int | None): Sub-exposure samples; None chooses it from the
-            exposure and the folded FWHM (``exposure.suggest_nsub``).
-    """
-
-    profile: int
-    harmonics: tuple[int, ...]
-    ocon: bool
-    baseline_order: int
-    gap_split_days: float | None
-    gamma_starts: tuple = (0.5, 1, 2, 4, 8)
-    separate_shape_chi2_frac: float = 0.01
-    clip_nsig: float = 5.0
-    allow_two_component: bool = True
-    rms_noise_two_comp_threshold: float = 1.5
-    eclipse_weight: float = 1.0
-    eclipse_phase_half: float = 0.12
-    exposure_days: float | None = None
-    exposure_nsub: int | None = None
 
 
 @dataclass
@@ -105,6 +48,7 @@ class FitPipelineResult:
         sig (ndarray): Uncertainties (catalogue).
         noise_floor (float): Out-of-eclipse noise (mag).
         initial_guess (dict): Folded start (M0, A1, A2, fwhm).
+        config (Config): The full layered configuration used (provenance).
     """
 
     model: EBModel
@@ -117,6 +61,7 @@ class FitPipelineResult:
     sig: np.ndarray
     noise_floor: float
     initial_guess: dict
+    config: Config
 
 
 def _shape_free_names(r, model: EBModel) -> list[str]:
@@ -154,7 +99,7 @@ def run_staged_fit(
     sig: np.ndarray,
     period_days: float,
     epoch_jd: float,
-    config: FitConfig,
+    config: Config | FitConfig,
 ) -> FitPipelineResult:
     """Run staged global fit and optional two-component primary extension.
 
@@ -167,7 +112,8 @@ def run_staged_fit(
         sig (ndarray): Catalogue magnitude uncertainties.
         period_days (float): VOTable PARAM period (days).
         epoch_jd (float): VOTable PARAM epoch as absolute JD (T0 for E).
-        config (FitConfig): Star-specific model and baseline choices.
+        config (Config | FitConfig): Layered configuration, or its flat view (the default
+            timing recipe is then recorded in the result).
 
     Returns:
         FitPipelineResult: Adopted and diagnostic fit products.
@@ -177,6 +123,15 @@ def run_staged_fit(
         ValueError: If the folded secondary is not an eclipse, or the profile is not
             one of the Table 2 profiles 1 to 4 (the staged fit frees Gamma).
     """
+    if isinstance(config, Config):
+        layered = config.validate()
+        config = layered.to_fit_config()
+    else:
+        layered = Config.from_fit_config(config)
+    if config.kterm:
+        raise ValueError(
+            "The staged pipeline does not free the K term (Eq. 14); fit it with fit_global."
+        )
     if config.profile not in (1, 2, 3, 4):
         raise ValueError(
             f"run_staged_fit supports Table 2 profiles 1 to 4 (they have Gamma); "
@@ -227,17 +182,17 @@ def run_staged_fit(
         config.harmonics,
         config.ocon,
     )
-    if fwhm_d / cadence_d < MIN_POINTS_PER_FWHM:
+    if fwhm_d / cadence_d < config.min_points_per_fwhm:
         logger.warning(
             "Fewer than %.0f points per FWHM; contacts may be exposure-smeared "
             "and D biased wide (set FitConfig.exposure_days to integrate over the exposure).",
-            MIN_POINTS_PER_FWHM,
+            config.min_points_per_fwhm,
         )
     if g["A2"] < 0:
         raise ValueError(
             f"Folded secondary depth A2={g['A2']:.4f} mag is not an eclipse."
         )
-    if g["A1"] < PRIMARY_A2_OVER_A1_MIN_RATIO * g["A2"]:
+    if g["A1"] < config.primary_a2_over_a1_min_ratio * g["A2"]:
         logger.warning(
             "A1 is not much deeper than A2; period may be P/2. Continuing with given P."
         )
@@ -431,7 +386,7 @@ def run_staged_fit(
             r_single,
             seg=seg_work,
             order=order,
-            eclipses=TWO_COMP_ECLIPSES,
+            eclipses=config.two_comp_eclipses,
         )
         for wf, g2, chi2, rms_mmag, st in tc_rows:
             logger.info(
@@ -458,17 +413,25 @@ def run_staged_fit(
             deg = two_component_degenerate(r_two.p, 1, r_single.p["A1"])
             pos = all(r_two.p[k] > 0 for k in ("D1", "G1", "D1b", "G1b"))
             rel_ok = (
-                all(v < MAX_TWO_COMP_REL_ERR for v in rel.values()) if rel else False
+                all(v < config.two_comp_max_rel_err for v in rel.values())
+                if rel
+                else False
             )
             check123 = (
-                rms_gain >= MIN_RMS_GAIN_FRAC
-                and n_agree >= MIN_AGREEING_TWO_COMP_STARTS
+                rms_gain >= config.two_comp_min_rms_gain_frac
+                and n_agree >= config.two_comp_min_agreeing_starts
                 and pos
                 and rel_ok
                 and not deg
             )
             timing_ok, timing_msg = _two_component_timing_ok(
-                t_work, mag_work, sig_work, model, r_single, r_two
+                t_work,
+                mag_work,
+                sig_work,
+                model,
+                r_single,
+                r_two,
+                config.two_comp_timing_agreement_sigma_max,
             )
             logger.info("  %s", timing_msg)
             res2, th2 = residuals(
@@ -562,4 +525,5 @@ def run_staged_fit(
         sig=sig_work,
         noise_floor=nf,
         initial_guess=g,
+        config=layered,
     )

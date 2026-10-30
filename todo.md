@@ -84,6 +84,14 @@ Reason for doing this first: the paper comparison must rest on an engine that do
 - Local-continuum measurement of the secondary depth in `initial_guess` (bright-secondary case), part of Phase 4 feature extraction.
 - Write to Z. Mikulasek with the results (developer).
 
+### Phase 3c: configuration (agreed 2026-10-30; single light curve first)
+- [x] Step 1: layered `Config` (`ModelSpec`, `DataSetup`, `FitPolicy`, `TimingRecipe`), validation, JSON round trip, hash; former constants moved into `FitPolicy` / `TimingRecipe`; pipeline accepts `Config` or `FitConfig` and stores the config in its result; `time_with_recipe`; recipe and hash in the ToM header. 66 tests pass, regression numbers unchanged. Notes section 8.
+- [ ] Step 2: `ModelSolution` (spec + values + errors + ephemeris + provenance, JSON-serialisable) returned by the fit; pure host-facing functions `fit(...)` and `time(...)`; typed exceptions; progress hook for background callbacks.
+- [ ] Step 3: `ParameterPlan` and borrowing between light curves (groups shape, amplitudes, harmonics, ephemeris; staged pipeline respects fixed parameters); timing `template = "reference"`; per-light-curve depth scale for dilution.
+- [ ] Update the per-star scripts to build a `Config` and save it next to the results (they still use `FitConfig`, which keeps working).
+- [ ] Deprecation decision for the flat `FitConfig` (kept for now as the resolved view).
+- Use cases to keep in mind: host application on a remote server (stateless, cacheable, JSON), local scripts, Jupyter notebooks, analysis with an agent; not only TESS data.
+
 ### Phase 4: automatic profile selection
 - [ ] Light-curve analysis features from the fold (depths, widths, flatness, out-of-eclipse curvature, reflection effect, secondary phase check).
 - [ ] Hypothesis tree: detached, contact, semi-detached, reflection, eccentric flag.
@@ -109,3 +117,4 @@ Reason for doing this first: the paper comparison must rest on an engine that do
 - 2026-10-30: Package moved to its own repository (/home/voz/projects/UPJS/mikulasek_eb, GitHub olgavoz1971/mikulasek-eb), black applied, README added, 23 tests pass. Folder rename and the editable-install note are obsolete. Still open: one configuration place; stray `.skill` file left behind in skvo_veb_2 history only.
 - 2026-10-30: Agreed order before Phase 4: Phase 3b (profiles check and #5 to #7, K term, exposure-time integration); the rest is listed under Deferred.
 - 2026-10-30: Phase 3b finished: Table 2 #5 to #7, K term, exposure integration. EK Com wall residuals are not exposure smearing (rms unchanged), so the cause stays open (single Gamma ceiling, spots, band). Next: Phase 4, after your decision on configuration design.
+- 2026-10-30: Phase 3c step 1 done (layered configuration). Next: step 2 (`ModelSolution`, pure `fit`/`time` functions), then Phase 4.

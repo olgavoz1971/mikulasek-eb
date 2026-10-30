@@ -135,3 +135,61 @@ def test_ek_com_rejections_reach_the_output(ek_com_run, tmp_path):
     header = out.read_text().splitlines()
     assert "# rejected_events: 1 (one_side_uncovered=1)" in header
     assert any(line.startswith("# rejected E=") for line in header)
+
+
+def test_layered_config_gives_the_same_fit_as_the_flat_one(ek_com_run):
+    """Config and FitConfig inputs give identical results; the result records the config."""
+    import fit_ek_com_s49 as star
+    from mikulasek_eb import Config
+
+    payload, flat_result = ek_com_run
+    layered = Config.from_fit_config(star.FIT_CONFIG)
+    result = run_staged_fit(
+        absolute_jd_to_mjd(payload["t"]),
+        payload["mag"],
+        payload["sig"],
+        payload["period"],
+        payload["epoch_jd"],
+        layered,
+    )
+    assert result.adopted.rms == flat_result.adopted.rms
+    assert result.config == layered
+    assert flat_result.config.config_hash() == layered.config_hash()
+
+
+def test_timing_recipe_is_recorded_in_the_header(ek_com_run, tmp_path):
+    """time_with_recipe equals time_both_walls, and the header carries recipe and hash."""
+    from mikulasek_eb import TimingRecipe
+    from mikulasek_eb.tom import time_with_recipe, write_timing_ascii
+
+    payload, pl = ek_com_run
+    recipe = TimingRecipe(require_contact_walls=False, clip_outliers=False)
+    vm = time_with_recipe(
+        pl.t_mjd,
+        pl.mag,
+        pl.sig,
+        pl.model,
+        pl.adopted,
+        "primary",
+        payload["epoch_jd"],
+        payload["period"],
+        recipe,
+    )
+    expected = MANIFEST["stars"]["EK_Com"]["regression_reference"]["timing_primary_n"]
+    assert len(vm["T"]) == expected
+    out = tmp_path / "pri.dat"
+    write_timing_ascii(
+        out,
+        vm,
+        lightcurve=Path("x.vot"),
+        period=payload["period"],
+        t0_jd=payload["epoch_jd"],
+        method="test",
+        window=recipe.window,
+        events="primary",
+        extra_comments=[],
+        recipe=recipe,
+    )
+    header = out.read_text().splitlines()
+    assert any(line.startswith("# timing_recipe: {") for line in header)
+    assert any(line.startswith("# timing_recipe_hash: ") for line in header)

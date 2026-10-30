@@ -190,3 +190,27 @@ K gives little in this idealised test.
 - The paper amplitude errors for AV Del ignore the correlation between a_k1 and a_k2.
 - The comparison uses different epochs (decades apart), a different band and TESS apertures; amplitudes and spot-dependent terms (cos 2 pi theta, O'Connell) are not expected to match.
 - The out-of-eclipse noise floor from `out_of_eclipse_mask` is inflated by orbital modulation in contact systems; use the rms in mmag.
+
+---
+
+## 8. Configuration and reuse (2026-10-30)
+
+**Four layers** (`mikulasek_eb.config`), agreed with the developer:
+
+| Layer | Class | Contents | Scope |
+|---|---|---|---|
+| Model | `ModelSpec` | profile, harmonics, O'Connell, K | the star; transferable between light curves |
+| Data | `DataSetup` | baseline order, gap split, exposure, `nsub` | one light curve |
+| Policy | `FitPolicy` | Gamma starts, clipping, two-component and eclipse-weight rules, thresholds | the algorithm; global defaults |
+| Timing | `TimingRecipe` | window, baseline order, sigma cut, wall coverage, clipping, `template="own"` | kept separately so one recipe can serve several light curves |
+
+`Config` bundles the four, validates them (`ConfigError`, unknown keys rejected), round-trips through JSON (`to_json`, `from_json`, `save`, `load`) and has a deterministic `config_hash()` (notes excluded) for cache keys and provenance. `FitConfig` is the flat, resolved view that the pipeline reads (`Config.to_fit_config()`, `Config.from_fit_config()`); a test guards that its fields are exactly the union of the three layers. `run_staged_fit` accepts either form and stores the full `Config` in `FitPipelineResult.config`. `time_with_recipe` applies a `TimingRecipe`; `write_timing_ascii(recipe=...)` writes the recipe JSON and its hash into the ToM header.
+
+**Rules.** Everything is plain data (no globals, no file paths, no data); the host application, a notebook or an agent can build, store and replay a config. JSON is the canonical file form. All former module constants of the pipeline and the two-component acceptance are now `FitPolicy` fields with the same defaults (a test pins them).
+
+**Not done yet (planned).**
+- Borrowing a model between light curves of one star: `ModelSolution` (spec, values, errors, ephemeris, provenance) and `ParameterPlan` (per parameter free, fixed or start-only), built from a solution with parameter groups `shape` (D, Gamma, C, K), `amplitudes` (A1, A2), `harmonics` (H, S1), `ephemeris`. The staged pipeline must then respect fixed parameters.
+- Timing `template = "reference"` (timings from another light curve's template). Today only `own` is accepted.
+- A depth-scale parameter per light curve for dilution differences.
+- Pure functions `fit(...)` and `time(...)` as the stable host-facing API, with typed exceptions and a progress hook.
+

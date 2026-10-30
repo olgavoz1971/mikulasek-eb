@@ -5,11 +5,21 @@ Numbering follows the standing T0 rule: ``E = round(2*(JD - T0)/P)/2``. T0 is th
 
 from __future__ import annotations
 
+import dataclasses
+import hashlib
+import json
 import logging
 
 import numpy as np
 from astropy.time import Time
 
+from .config import (  # noqa: F401
+    HALF_ORBIT_WINDOW,
+    LOCAL_WINDOWS,
+    MAX_SIGMA_FACTOR,
+    TIMING_BASELINE_ORDER,
+    TimingRecipe,
+)
 from .tuning import clip_timings, wall_band
 from .timing import fit_ephemeris, virtual_minima
 from .model import predicted_time
@@ -18,20 +28,8 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 
-# Half-orbit window: quadrature to quadrature; engine caps virtual_minima here.
-HALF_ORBIT_WINDOW = 0.25
-
-
-# Local windows tried for primary/secondary-only files (phase half-width).
-LOCAL_WINDOWS = (0.15, 0.10, 0.06)
-
-
-# Per-event polynomial degree in fit_minimum / virtual_minima.
-TIMING_BASELINE_ORDER = 1
-
-
-# Drop events whose formal sigma exceeds this times the median sigma.
-MAX_SIGMA_FACTOR = 5.0
+# Defaults of the timing recipe live in ``config``; re-exported under their old names.
+# HALF_ORBIT_WINDOW is quadrature to quadrature; the engine caps virtual_minima there.
 
 
 # Column separator in the two-column ASCII files.
@@ -147,19 +145,22 @@ def select_eclipses(vm: dict, which: str) -> dict:
     return {k: np.asarray(v)[keep] for k, v in vm.items()}
 
 
-def clean_timings(vm: dict, deg: int = 1) -> dict:
+def clean_timings(
+    vm: dict, deg: int = 1, max_sigma_factor: float = MAX_SIGMA_FACTOR
+) -> dict:
     """Drop huge-sigma events and clip 4-sigma outliers about a linear ephemeris.
 
     Args:
         vm (dict): Timing arrays.
         deg (int): Ephemeris degree for clipping.
+        max_sigma_factor (float): Drop events whose sigma exceeds this times the median.
 
     Returns:
         dict: Cleaned timing arrays (empty if nothing survives).
     """
     if not has_timings(vm):
         return empty_timings()
-    good = vm["sigma"] < MAX_SIGMA_FACTOR * np.median(vm["sigma"])
+    good = vm["sigma"] < max_sigma_factor * np.median(vm["sigma"])
     vm = {k: np.asarray(v)[good] for k, v in vm.items()}
     if len(vm["T"]) == 0:
         logger.warning("No events remain after the median-sigma cut.")
@@ -186,6 +187,8 @@ def time_both_walls(
     require_contact_walls: bool = True,
     clip_outliers: bool = True,
     rejected: list | None = None,
+    baseline_order: int = TIMING_BASELINE_ORDER,
+    max_sigma_factor: float = MAX_SIGMA_FACTOR,
 ) -> dict:
     """Time eclipses; convert T to JD and number E from T0.
 
@@ -210,6 +213,8 @@ def time_both_walls(
             type ``which`` that was not timed: ``E`` (from T0), ``T_pred_jd``
             (predicted mid-eclipse, absolute JD), ``reason`` and ``detail``
             (see ``virtual_minima``).
+        baseline_order (int): Per-event polynomial degree.
+        max_sigma_factor (float): Sigma cut in units of the median sigma (used when clipping).
 
     Returns:
         dict: Timings with ``T`` as absolute JD and E from T0.
@@ -224,7 +229,7 @@ def time_both_walls(
         r.p,
         r.ephem,
         window=window,
-        order=TIMING_BASELINE_ORDER,
+        order=baseline_order,
         free=(),
         wall_band=wb,
         rejected=engine_rejected,
@@ -240,10 +245,57 @@ def time_both_walls(
     vm["T"] = mjd_to_jd(vm["T"])
     vm = assign_e_from_t0(vm, t0_jd, period)
     vm = select_eclipses(vm, which)
-    out = clean_timings(vm) if clip_outliers else vm
+    out = clean_timings(vm, max_sigma_factor=max_sigma_factor) if clip_outliers else vm
     if not has_timings(out):
         logger.warning("No %s events left at window=%.2f.", which, window)
     return out
+
+
+def time_with_recipe(
+    t_mjd,
+    mag,
+    sig,
+    model,
+    r,
+    which: str,
+    t0_jd: float,
+    period: float,
+    recipe: TimingRecipe,
+    rejected: list | None = None,
+) -> dict:
+    """Time one eclipse type with a ``TimingRecipe`` (the same recipe can serve many light curves).
+
+    Args:
+        t_mjd (ndarray): Times (MJD).
+        mag (ndarray): Magnitudes.
+        sig (ndarray): Magnitude errors.
+        model (EBModel): Template model.
+        r (FitResult): Fit providing the template and ephemeris (``template = "own"``).
+        which (str): ``all``, ``primary`` or ``secondary`` on the T0 fold.
+        t0_jd (float): Folding T0 as absolute JD.
+        period (float): Period for T0 numbering (days).
+        recipe (TimingRecipe): Timing method.
+        rejected (list | None): Receives the events that could not be timed.
+
+    Returns:
+        dict: Timings, see ``time_both_walls``.
+    """
+    return time_both_walls(
+        t_mjd,
+        mag,
+        sig,
+        model,
+        r,
+        recipe.window,
+        which,
+        t0_jd,
+        period,
+        require_contact_walls=recipe.require_contact_walls,
+        clip_outliers=recipe.clip_outliers,
+        rejected=rejected,
+        baseline_order=recipe.baseline_order,
+        max_sigma_factor=recipe.max_sigma_factor,
+    )
 
 
 def _annotate_rejections(
@@ -355,6 +407,7 @@ def write_timing_ascii(
         "90-10 percent contact wall_band not required"
     ),
     rejected: list | None = None,
+    recipe: TimingRecipe | None = None,
 ) -> None:
     """Write times of minima as two-column ASCII (JD, error in days).
 
@@ -372,6 +425,8 @@ def write_timing_ascii(
         coverage_line (str): Header line describing the coverage cut.
         rejected (list | None): Eclipses of this type that were not timed (from
             ``time_both_walls``); written to the header with their reason.
+        recipe (TimingRecipe | None): Recipe used; its JSON and hash go to the header and
+            its baseline order replaces the default one.
     """
     if not has_timings(vm):
         logger.warning("skip %s: no timings to write", path)
@@ -391,7 +446,7 @@ def write_timing_ascii(
         f"# window_phase: {window}",
         f"# events: {events}",
         f"# {coverage_line}",
-        f"# timing_baseline_order: {TIMING_BASELINE_ORDER}",
+        f"# timing_baseline_order: {recipe.baseline_order if recipe else TIMING_BASELINE_ORDER}",
         f"# time_system: Julian Date, J0=0 (TIMESYS timescale={ts_label})",
         "# columns: jd   error_of_time_of_minimum",
         "# units: day   day",
@@ -399,6 +454,14 @@ def write_timing_ascii(
     ]
     for c in extra_comments:
         lines.append(f"# {c}")
+    if recipe is not None:
+        recipe_json = json.dumps(
+            dataclasses.asdict(recipe), sort_keys=True, separators=(",", ":")
+        )
+        lines.append(f"# timing_recipe: {recipe_json}")
+        lines.append(
+            f"# timing_recipe_hash: {hashlib.sha256(recipe_json.encode()).hexdigest()[:12]}"
+        )
     if rejected is not None:
         reasons = sorted({row["reason"] for row in rejected})
         counts = ", ".join(
