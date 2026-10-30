@@ -34,14 +34,15 @@ class FitOutput:
         t_mjd (ndarray): Times of the points the fit used (after its out-of-eclipse clip).
         mag (ndarray): Magnitudes of those points.
         sig (ndarray): Their errors (after eclipse weighting, if requested).
-        pipeline (FitPipelineResult): Full pipeline result for plots and diagnostics.
+        pipeline (FitPipelineResult | None): Full pipeline result for plots and diagnostics;
+            None for a borrowed fit (``fit_borrowed``), which has no staged search.
     """
 
     solution: ModelSolution
     t_mjd: np.ndarray
     mag: np.ndarray
     sig: np.ndarray
-    pipeline: FitPipelineResult
+    pipeline: FitPipelineResult | None
 
 
 @dataclass

@@ -93,6 +93,7 @@ from .errors import (
     NoValidSolution,
 )
 from .solution import ModelSolution
+from .borrow import GROUPS, ParameterPlan, fit_borrowed
 from .config import (
     Config,
     DataSetup,
@@ -115,6 +116,9 @@ from .io import load_tess_votable
 from .helpers import absolute_jd_to_mjd
 
 __all__ = [
+    "GROUPS",
+    "ParameterPlan",
+    "fit_borrowed",
     "fit",
     "time",
     "FitOutput",
