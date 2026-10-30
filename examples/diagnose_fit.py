@@ -94,8 +94,11 @@ def main() -> None:
 
     fig, ax = plt.subplots(3, 2, figsize=(13, 11))
     o = np.argsort(ph)
-    ax[0, 0].plot(ph, pl.mag, ".", ms=1.5, color="0.6")
-    ax[0, 0].plot(ph[o], (pl.mag - res)[o], "r-", lw=1)
+    grid = np.linspace(0.0, 1.0, 2001)
+    curve = pl.model(grid, ad.p)  # pure template, no baseline
+    flat = pl.mag - (yhat - tmpl)  # data with the fitted baseline removed
+    ax[0, 0].plot(ph, flat, ".", ms=1.5, color="0.6")
+    ax[0, 0].plot(grid, curve, "r-", lw=1)
     ax[0, 0].invert_yaxis()
     ax[0, 0].set_title(f"{label}: {r.best.name} fold")
     ax[0, 1].plot(ph, 1e3 * res, ".", ms=1.5, color="0.6")
@@ -107,9 +110,11 @@ def main() -> None:
         x = (ph - c + 0.5) % 1 - 0.5
         a = ax[1 + k, 1] if k == 0 else ax[2, 0]
         s = np.abs(x) < 0.15
-        a.plot(x[s], pl.mag[s], ".", ms=2, color="0.6")
-        oo = np.argsort(x[s])
-        a.plot(x[s][oo], (pl.mag - res)[s][oo], "r-")
+        a.plot(x[s], flat[s], ".", ms=2, color="0.6")
+        g = (grid - c + 0.5) % 1 - 0.5
+        gs = np.abs(g) < 0.15
+        og = np.argsort(g[gs])
+        a.plot(g[gs][og], curve[gs][og], "r-")
         a.invert_yaxis()
         a.set_title("primary zoom" if k == 0 else "secondary zoom")
     ax[2, 1].hist(res / sig, bins=60)
