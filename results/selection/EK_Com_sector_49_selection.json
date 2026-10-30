@@ -1,0 +1,114 @@
+{
+  "best": "h23_b1",
+  "best_config": {
+    "schema_version": 1,
+    "model": {
+      "profile": 1,
+      "harmonics": [
+        2,
+        3
+      ],
+      "ocon": true,
+      "kterm": false
+    },
+    "data": {
+      "baseline_order": 1,
+      "gap_split_days": 0.5,
+      "exposure_days": 0.006944540422409773,
+      "exposure_nsub": null
+    },
+    "policy": {
+      "gamma_starts": [
+        0.5,
+        1,
+        2,
+        4,
+        8
+      ],
+      "separate_shape_chi2_frac": 0.01,
+      "clip_nsig": 5.0,
+      "allow_two_component": true,
+      "rms_noise_two_comp_threshold": 1.5,
+      "eclipse_weight": 1.0,
+      "eclipse_phase_half": 0.12,
+      "min_points_per_fwhm": 8.0,
+      "primary_a2_over_a1_min_ratio": 1.2,
+      "two_comp_min_rms_gain_frac": 0.25,
+      "two_comp_min_agreeing_starts": 2,
+      "two_comp_max_rel_err": 0.5,
+      "two_comp_eclipses": [
+        1
+      ],
+      "two_comp_timing_agreement_sigma_max": 1.0
+    },
+    "timing": {
+      "window": 0.25,
+      "baseline_order": 1,
+      "max_sigma_factor": 5.0,
+      "require_contact_walls": true,
+      "clip_outliers": true,
+      "local_windows": [
+        0.15,
+        0.1,
+        0.06
+      ],
+      "template": "own"
+    },
+    "notes": ""
+  },
+  "table": [
+    {
+      "name": "h123_b0",
+      "config_hash": "333cf49edecd",
+      "status": "ok",
+      "rms_mmag": 5.704039145483213,
+      "k": 14,
+      "n_common": 2651,
+      "bic": -3001.1679779658307,
+      "delta_bic": 25.04067264561172,
+      "two_component": false
+    },
+    {
+      "name": "h123_b1",
+      "config_hash": "1e6c6f5ada87",
+      "status": "ok",
+      "rms_mmag": 5.414670664211869,
+      "k": 16,
+      "n_common": 2651,
+      "bic": -3020.818613500682,
+      "delta_bic": 5.390037110760204,
+      "two_component": false
+    },
+    {
+      "name": "h23_b0",
+      "config_hash": "f068f0184bd7",
+      "status": "ok",
+      "rms_mmag": 5.7068443839741745,
+      "k": 13,
+      "n_common": 2651,
+      "bic": -3006.572410825178,
+      "delta_bic": 19.63623978626447,
+      "two_component": false
+    },
+    {
+      "name": "h23_b1",
+      "config_hash": "e07c5495498b",
+      "status": "ok",
+      "rms_mmag": 5.41746437302905,
+      "k": 15,
+      "n_common": 2651,
+      "bic": -3026.2086506114424,
+      "delta_bic": 0.0,
+      "two_component": false
+    }
+  ],
+  "ask_human": true,
+  "reasons": [
+    "eclipses are poorly resolved (5.1 points per FWHM)",
+    "h123_b1 is within 5.4 BIC of h23_b1 (decisive difference is 10)"
+  ],
+  "remarks": [],
+  "n_eff": 298.159939607215,
+  "n_eff_measured": true,
+  "features_hash": "b7a26c0d83f6"
+}

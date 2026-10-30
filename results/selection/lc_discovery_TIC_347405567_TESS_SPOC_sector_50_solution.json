@@ -1,0 +1,109 @@
+{
+  "schema_version": 1,
+  "config": {
+    "schema_version": 1,
+    "model": {
+      "profile": 1,
+      "harmonics": [
+        2,
+        3
+      ],
+      "ocon": true,
+      "kterm": false
+    },
+    "data": {
+      "baseline_order": 0,
+      "gap_split_days": 0.5,
+      "exposure_days": null,
+      "exposure_nsub": null
+    },
+    "policy": {
+      "gamma_starts": [
+        0.5,
+        1,
+        2,
+        4,
+        8
+      ],
+      "separate_shape_chi2_frac": 0.01,
+      "clip_nsig": 5.0,
+      "allow_two_component": true,
+      "rms_noise_two_comp_threshold": 1.5,
+      "eclipse_weight": 1.0,
+      "eclipse_phase_half": 0.12,
+      "min_points_per_fwhm": 8.0,
+      "primary_a2_over_a1_min_ratio": 1.2,
+      "two_comp_min_rms_gain_frac": 0.25,
+      "two_comp_min_agreeing_starts": 2,
+      "two_comp_max_rel_err": 0.5,
+      "two_comp_eclipses": [
+        1
+      ],
+      "two_comp_timing_agreement_sigma_max": 1.0
+    },
+    "timing": {
+      "window": 0.25,
+      "baseline_order": 1,
+      "max_sigma_factor": 5.0,
+      "require_contact_walls": true,
+      "clip_outliers": true,
+      "local_windows": [
+        0.15,
+        0.1,
+        0.06
+      ],
+      "template": "own"
+    },
+    "notes": ""
+  },
+  "params": {
+    "A1": 0.27912581370006156,
+    "A2": 0.2996919739191204,
+    "D1": 0.12663621738141356,
+    "G1": 0.6297697369904496,
+    "C1": 0.0,
+    "D2": 0.09401317774590041,
+    "G2": 0.7452629194752044,
+    "C2": 0.0,
+    "H2": 0.015602763979367612,
+    "H3": 0.02169726167733141,
+    "S1": -0.004979922414606757
+  },
+  "errors": {
+    "A1": 0.010103915338517776,
+    "A2": 0.02551720532083524,
+    "D1": 0.0195916078067598,
+    "G1": 0.04535295378243666,
+    "D2": 0.0018967002835122732,
+    "G2": 0.018647068934354027,
+    "H2": 0.005005633993785379,
+    "H3": 0.010927639824796408,
+    "S1": 9.997350989052337e-05,
+    "M0": 0.0008248561143627162,
+    "P0": 9.78026158743865e-07
+  },
+  "ephemeris": {
+    "M0": 59678.685823015934,
+    "P0": 0.3705709917766171,
+    "Pdot": 0.0
+  },
+  "stats": {
+    "chi2": 185171.05813992317,
+    "dof": 2917,
+    "rchi2": 63.479965080535884,
+    "rms_mag": 0.004230643906249774,
+    "noise_floor_mag": 0.006987188948013085,
+    "rms_over_noise": 0.6054858309582172,
+    "n_points": 2932,
+    "n_input": 2932,
+    "rank_deficient": false,
+    "two_component": false
+  },
+  "exposure": null,
+  "provenance": {
+    "data_id": "XY Boo S50 10-min",
+    "epoch_jd": 2453903.474,
+    "period_input_days": 0.370574,
+    "package_version": "0.1.0"
+  }
+}

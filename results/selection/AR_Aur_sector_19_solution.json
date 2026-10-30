@@ -1,0 +1,111 @@
+{
+  "schema_version": 1,
+  "config": {
+    "schema_version": 1,
+    "model": {
+      "profile": 1,
+      "harmonics": [
+        1,
+        2
+      ],
+      "ocon": true,
+      "kterm": false
+    },
+    "data": {
+      "baseline_order": 1,
+      "gap_split_days": 0.5,
+      "exposure_days": null,
+      "exposure_nsub": null
+    },
+    "policy": {
+      "gamma_starts": [
+        0.5,
+        1,
+        2,
+        4,
+        8
+      ],
+      "separate_shape_chi2_frac": 0.01,
+      "clip_nsig": 5.0,
+      "allow_two_component": true,
+      "rms_noise_two_comp_threshold": 1.5,
+      "eclipse_weight": 1.0,
+      "eclipse_phase_half": 0.12,
+      "min_points_per_fwhm": 8.0,
+      "primary_a2_over_a1_min_ratio": 1.2,
+      "two_comp_min_rms_gain_frac": 0.25,
+      "two_comp_min_agreeing_starts": 2,
+      "two_comp_max_rel_err": 0.5,
+      "two_comp_eclipses": [
+        1
+      ],
+      "two_comp_timing_agreement_sigma_max": 1.0
+    },
+    "timing": {
+      "window": 0.25,
+      "baseline_order": 1,
+      "max_sigma_factor": 5.0,
+      "require_contact_walls": true,
+      "clip_outliers": true,
+      "local_windows": [
+        0.15,
+        0.1,
+        0.06
+      ],
+      "template": "own"
+    },
+    "notes": ""
+  },
+  "params": {
+    "A1": 0.6511228984852683,
+    "A2": 0.5613233996127526,
+    "D1": 0.013150889497356788,
+    "G1": 0.6233076693221465,
+    "C1": 0.10911889977395299,
+    "D2": 0.013096595207797938,
+    "G2": 0.6469393447862093,
+    "C2": 0.12085408966743269,
+    "H1": 0.0018131405166668542,
+    "H2": 0.0009580849446560393,
+    "S1": 0.00018468263797181774
+  },
+  "errors": {
+    "A1": 0.00032492116420360675,
+    "A2": 0.0002980431080695975,
+    "D1": 1.5196662481025715e-05,
+    "G1": 0.0010727255782565985,
+    "C1": 0.0023835632311399167,
+    "D2": 1.6260186016922457e-05,
+    "G2": 0.0013143515345589482,
+    "C2": 0.002692525051196754,
+    "H1": 1.980407249651558e-05,
+    "H2": 1.9895975883597e-05,
+    "S1": 1.7059968993282362e-05,
+    "M0": 5.177683795143401e-05,
+    "P0": 4.745326138978367e-06
+  },
+  "ephemeris": {
+    "M0": 58826.94086861094,
+    "P0": 4.13465110859539,
+    "Pdot": 0.0
+  },
+  "stats": {
+    "chi2": 1600998.820464281,
+    "dof": 16855,
+    "rchi2": 94.9865808640926,
+    "rms_mag": 0.0017043616666357496,
+    "noise_floor_mag": 0.0004535401929185833,
+    "rms_over_noise": 3.7579065609775095,
+    "n_points": 16872,
+    "n_input": 16884,
+    "rank_deficient": false,
+    "two_component": false
+  },
+  "exposure": null,
+  "provenance": {
+    "data_id": "AR Aur S19",
+    "epoch_jd": 2460650.82026,
+    "period_input_days": 4.134651,
+    "package_version": "0.1.0"
+  }
+}

@@ -1,0 +1,115 @@
+{
+  "schema_version": 1,
+  "config": {
+    "schema_version": 1,
+    "model": {
+      "profile": 1,
+      "harmonics": [
+        1,
+        2,
+        3
+      ],
+      "ocon": true,
+      "kterm": false
+    },
+    "data": {
+      "baseline_order": 1,
+      "gap_split_days": 0.5,
+      "exposure_days": 0.020833654329180717,
+      "exposure_nsub": null
+    },
+    "policy": {
+      "gamma_starts": [
+        0.5,
+        1,
+        2,
+        4,
+        8
+      ],
+      "separate_shape_chi2_frac": 0.01,
+      "clip_nsig": 5.0,
+      "allow_two_component": true,
+      "rms_noise_two_comp_threshold": 1.5,
+      "eclipse_weight": 1.0,
+      "eclipse_phase_half": 0.12,
+      "min_points_per_fwhm": 8.0,
+      "primary_a2_over_a1_min_ratio": 1.2,
+      "two_comp_min_rms_gain_frac": 0.25,
+      "two_comp_min_agreeing_starts": 2,
+      "two_comp_max_rel_err": 0.5,
+      "two_comp_eclipses": [
+        1
+      ],
+      "two_comp_timing_agreement_sigma_max": 1.0
+    },
+    "timing": {
+      "window": 0.25,
+      "baseline_order": 1,
+      "max_sigma_factor": 5.0,
+      "require_contact_walls": true,
+      "clip_outliers": true,
+      "local_windows": [
+        0.15,
+        0.1,
+        0.06
+      ],
+      "template": "own"
+    },
+    "notes": ""
+  },
+  "params": {
+    "A1": 0.41607185176514366,
+    "A2": 0.10438309854997015,
+    "D1": 0.0501468482631549,
+    "G1": 1.2052925638471916,
+    "C1": 0.0,
+    "D2": 0.05668329369886233,
+    "G2": 1.7540233739891637,
+    "C2": 0.0,
+    "H1": 0.046077046639519254,
+    "H2": 0.046379288328472185,
+    "H3": 0.008298385784520992,
+    "S1": 0.0010572486743363992
+  },
+  "errors": {
+    "A1": 0.0019513836820189668,
+    "A2": 0.0023799656080068913,
+    "D1": 0.0001814610397551538,
+    "G1": 0.010764425209862155,
+    "D2": 0.0006766265956198478,
+    "G2": 0.05634022535468354,
+    "H1": 0.0012354125518210211,
+    "H2": 0.0004585828656220337,
+    "H3": 0.0006392334943698114,
+    "S1": 0.00013381417100602654,
+    "M0": 0.00026027927989417845,
+    "P0": 5.330392319963983e-06
+  },
+  "ephemeris": {
+    "M0": 58750.41382263628,
+    "P0": 0.9350859743136397,
+    "Pdot": 0.0
+  },
+  "stats": {
+    "chi2": 32869.296721942075,
+    "dof": 1100,
+    "rchi2": 29.88117883812916,
+    "rms_mag": 0.003587120725295927,
+    "noise_floor_mag": 0.0065271223876122615,
+    "rms_over_noise": 0.5495715435187604,
+    "n_points": 1116,
+    "n_input": 1116,
+    "rank_deficient": false,
+    "two_component": false
+  },
+  "exposure": {
+    "days": 0.020833654329180717,
+    "nsub": 5
+  },
+  "provenance": {
+    "data_id": "AA And S16 30-min",
+    "epoch_jd": 2452500.73,
+    "period_input_days": 0.9350969,
+    "package_version": "0.1.0"
+  }
+}

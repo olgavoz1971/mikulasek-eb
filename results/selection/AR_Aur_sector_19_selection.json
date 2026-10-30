@@ -1,0 +1,93 @@
+{
+  "best": "h12_b1",
+  "best_config": {
+    "schema_version": 1,
+    "model": {
+      "profile": 1,
+      "harmonics": [
+        1,
+        2
+      ],
+      "ocon": true,
+      "kterm": false
+    },
+    "data": {
+      "baseline_order": 1,
+      "gap_split_days": 0.5,
+      "exposure_days": null,
+      "exposure_nsub": null
+    },
+    "policy": {
+      "gamma_starts": [
+        0.5,
+        1,
+        2,
+        4,
+        8
+      ],
+      "separate_shape_chi2_frac": 0.01,
+      "clip_nsig": 5.0,
+      "allow_two_component": true,
+      "rms_noise_two_comp_threshold": 1.5,
+      "eclipse_weight": 1.0,
+      "eclipse_phase_half": 0.12,
+      "min_points_per_fwhm": 8.0,
+      "primary_a2_over_a1_min_ratio": 1.2,
+      "two_comp_min_rms_gain_frac": 0.25,
+      "two_comp_min_agreeing_starts": 2,
+      "two_comp_max_rel_err": 0.5,
+      "two_comp_eclipses": [
+        1
+      ],
+      "two_comp_timing_agreement_sigma_max": 1.0
+    },
+    "timing": {
+      "window": 0.25,
+      "baseline_order": 1,
+      "max_sigma_factor": 5.0,
+      "require_contact_walls": true,
+      "clip_outliers": true,
+      "local_windows": [
+        0.15,
+        0.1,
+        0.06
+      ],
+      "template": "own"
+    },
+    "notes": ""
+  },
+  "table": [
+    {
+      "name": "h12_b0",
+      "config_hash": "93700358ace9",
+      "status": "ok",
+      "rms_mmag": 1.716139980014223,
+      "k": 15,
+      "n_common": 16872,
+      "bic": -214724.9154114555,
+      "delta_bic": 212.92539385013515,
+      "two_component": false
+    },
+    {
+      "name": "h12_b1",
+      "config_hash": "a0ebf13243f1",
+      "status": "ok",
+      "rms_mmag": 1.7043616666357495,
+      "k": 17,
+      "n_common": 16872,
+      "bic": -214937.84080530563,
+      "delta_bic": 0.0,
+      "two_component": false
+    }
+  ],
+  "ask_human": true,
+  "reasons": [
+    "BIC used n_eff = number of points (correlation time not measured)"
+  ],
+  "remarks": [
+    "correlation time not measured: BIC uses the number of points as n_eff (residuals are correlated, so the evidence is overstated)"
+  ],
+  "n_eff": 16872.0,
+  "n_eff_measured": false,
+  "features_hash": "6787cbc475ab"
+}

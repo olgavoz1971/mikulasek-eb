@@ -1,0 +1,108 @@
+{
+  "schema_version": 1,
+  "config": {
+    "schema_version": 1,
+    "model": {
+      "profile": 1,
+      "harmonics": [
+        1,
+        2,
+        3
+      ],
+      "ocon": false,
+      "kterm": false
+    },
+    "data": {
+      "baseline_order": 0,
+      "gap_split_days": 0.5,
+      "exposure_days": null,
+      "exposure_nsub": null
+    },
+    "policy": {
+      "gamma_starts": [
+        0.5,
+        1,
+        2,
+        4,
+        8
+      ],
+      "separate_shape_chi2_frac": 0.01,
+      "clip_nsig": 5.0,
+      "allow_two_component": true,
+      "rms_noise_two_comp_threshold": 1.5,
+      "eclipse_weight": 1.0,
+      "eclipse_phase_half": 0.12,
+      "min_points_per_fwhm": 8.0,
+      "primary_a2_over_a1_min_ratio": 1.2,
+      "two_comp_min_rms_gain_frac": 0.25,
+      "two_comp_min_agreeing_starts": 2,
+      "two_comp_max_rel_err": 0.5,
+      "two_comp_eclipses": [
+        1
+      ],
+      "two_comp_timing_agreement_sigma_max": 1.0
+    },
+    "timing": {
+      "window": 0.25,
+      "baseline_order": 1,
+      "max_sigma_factor": 5.0,
+      "require_contact_walls": true,
+      "clip_outliers": true,
+      "local_windows": [
+        0.15,
+        0.1,
+        0.06
+      ],
+      "template": "own"
+    },
+    "notes": ""
+  },
+  "params": {
+    "A1": 0.4201021556085818,
+    "A2": 0.052237770578859,
+    "D1": 0.016602831563023827,
+    "G1": 1.25844935649443,
+    "C1": 0.0,
+    "D2": 0.02012106886809086,
+    "G2": 1.0,
+    "C2": 0.0,
+    "H1": 0.2006156627340733,
+    "H2": -0.025569154095019364,
+    "H3": -0.0007471536442243363
+  },
+  "errors": {
+    "A1": 0.003324030781378252,
+    "A2": 0.001280203524038255,
+    "D1": 0.00016130887047612343,
+    "G1": 0.043688740467839125,
+    "H1": 0.00037812126438435537,
+    "H2": 0.00036367602958036014,
+    "H3": 0.000362500812165565,
+    "M0": 0.0004481505845000506,
+    "P0": 2.437559541651839e-06
+  },
+  "ephemeris": {
+    "M0": 59022.04225612592,
+    "P0": 0.4717312957807122,
+    "Pdot": 0.0
+  },
+  "stats": {
+    "chi2": 16278.38003579265,
+    "dof": 16925,
+    "rchi2": 0.9617949799582068,
+    "rms_mag": 0.0341329052382032,
+    "noise_floor_mag": 0.02734720586547342,
+    "rms_over_noise": 1.2481313596025143,
+    "n_points": 16936,
+    "n_input": 16940,
+    "rank_deficient": false,
+    "two_component": false
+  },
+  "exposure": null,
+  "provenance": {
+    "data_id": "V477 Lyr S26",
+    "epoch_jd": 2444350.8214,
+    "period_input_days": 0.471739,
+    "package_version": "0.1.0"
+  }
+}

@@ -1,0 +1,112 @@
+{
+  "schema_version": 1,
+  "config": {
+    "schema_version": 1,
+    "model": {
+      "profile": 1,
+      "harmonics": [
+        2,
+        3
+      ],
+      "ocon": true,
+      "kterm": false
+    },
+    "data": {
+      "baseline_order": 1,
+      "gap_split_days": 0.5,
+      "exposure_days": 0.006944540422409773,
+      "exposure_nsub": null
+    },
+    "policy": {
+      "gamma_starts": [
+        0.5,
+        1,
+        2,
+        4,
+        8
+      ],
+      "separate_shape_chi2_frac": 0.01,
+      "clip_nsig": 5.0,
+      "allow_two_component": true,
+      "rms_noise_two_comp_threshold": 1.5,
+      "eclipse_weight": 1.0,
+      "eclipse_phase_half": 0.12,
+      "min_points_per_fwhm": 8.0,
+      "primary_a2_over_a1_min_ratio": 1.2,
+      "two_comp_min_rms_gain_frac": 0.25,
+      "two_comp_min_agreeing_starts": 2,
+      "two_comp_max_rel_err": 0.5,
+      "two_comp_eclipses": [
+        1
+      ],
+      "two_comp_timing_agreement_sigma_max": 1.0
+    },
+    "timing": {
+      "window": 0.25,
+      "baseline_order": 1,
+      "max_sigma_factor": 5.0,
+      "require_contact_walls": true,
+      "clip_outliers": true,
+      "local_windows": [
+        0.15,
+        0.1,
+        0.06
+      ],
+      "template": "own"
+    },
+    "notes": ""
+  },
+  "params": {
+    "A1": 0.3365381359021142,
+    "A2": 0.2675163369819473,
+    "D1": 0.05289969857309787,
+    "G1": 1.6837621549956188,
+    "C1": 0.0,
+    "D2": 0.05163450017435085,
+    "G2": 1.2958425657293011,
+    "C2": 0.0,
+    "H2": 0.12450126579078537,
+    "H3": -0.004801977578691077,
+    "S1": 0.0036956861465658837
+  },
+  "errors": {
+    "A1": 0.0009775431063849607,
+    "A2": 0.0010552038426907015,
+    "D1": 0.0001628714054477258,
+    "G1": 0.017762422743707044,
+    "D2": 0.00022188975505821047,
+    "G2": 0.01696609348405005,
+    "H2": 0.0004366269064127524,
+    "H3": 0.00016381068216996686,
+    "S1": 0.0001280487249907567,
+    "M0": 0.0001855065435105617,
+    "P0": 3.45060470000721e-07
+  },
+  "ephemeris": {
+    "M0": 59651.750186028534,
+    "P0": 0.26668991175097173,
+    "Pdot": 0.0
+  },
+  "stats": {
+    "chi2": 53260.161615848454,
+    "dof": 2636,
+    "rchi2": 20.204917153205027,
+    "rms_mag": 0.00541746437302905,
+    "noise_floor_mag": 0.016485592116742262,
+    "rms_over_noise": 0.3286181251280164,
+    "n_points": 2651,
+    "n_input": 2651,
+    "rank_deficient": false,
+    "two_component": false
+  },
+  "exposure": {
+    "days": 0.006944540422409773,
+    "nsub": 5
+  },
+  "provenance": {
+    "data_id": "EK Com S49",
+    "epoch_jd": 2452500.0114,
+    "period_input_days": 0.2666852,
+    "package_version": "0.1.0"
+  }
+}

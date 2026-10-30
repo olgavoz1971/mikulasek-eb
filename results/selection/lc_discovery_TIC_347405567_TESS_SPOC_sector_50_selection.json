@@ -1,0 +1,115 @@
+{
+  "best": "h23_b0",
+  "best_config": {
+    "schema_version": 1,
+    "model": {
+      "profile": 1,
+      "harmonics": [
+        2,
+        3
+      ],
+      "ocon": true,
+      "kterm": false
+    },
+    "data": {
+      "baseline_order": 0,
+      "gap_split_days": 0.5,
+      "exposure_days": null,
+      "exposure_nsub": null
+    },
+    "policy": {
+      "gamma_starts": [
+        0.5,
+        1,
+        2,
+        4,
+        8
+      ],
+      "separate_shape_chi2_frac": 0.01,
+      "clip_nsig": 5.0,
+      "allow_two_component": true,
+      "rms_noise_two_comp_threshold": 1.5,
+      "eclipse_weight": 1.0,
+      "eclipse_phase_half": 0.12,
+      "min_points_per_fwhm": 8.0,
+      "primary_a2_over_a1_min_ratio": 1.2,
+      "two_comp_min_rms_gain_frac": 0.25,
+      "two_comp_min_agreeing_starts": 2,
+      "two_comp_max_rel_err": 0.5,
+      "two_comp_eclipses": [
+        1
+      ],
+      "two_comp_timing_agreement_sigma_max": 1.0
+    },
+    "timing": {
+      "window": 0.25,
+      "baseline_order": 1,
+      "max_sigma_factor": 5.0,
+      "require_contact_walls": true,
+      "clip_outliers": true,
+      "local_windows": [
+        0.15,
+        0.1,
+        0.06
+      ],
+      "template": "own"
+    },
+    "notes": ""
+  },
+  "table": [
+    {
+      "name": "h123_b0",
+      "config_hash": "4f2d4072f3e3",
+      "status": "FitDidNotConverge: fit_global: solver did not converge (status=0: The maximum number of function evaluations is exceeded.)",
+      "rms_mmag": null,
+      "k": null,
+      "n_common": null,
+      "bic": null,
+      "delta_bic": null,
+      "two_component": null
+    },
+    {
+      "name": "h123_b1",
+      "config_hash": "82e41c9b55b6",
+      "status": "FitDidNotConverge: fit_global: solver did not converge (status=0: The maximum number of function evaluations is exceeded.)",
+      "rms_mmag": null,
+      "k": null,
+      "n_common": null,
+      "bic": null,
+      "delta_bic": null,
+      "two_component": null
+    },
+    {
+      "name": "h23_b0",
+      "config_hash": "2d5c78963ddc",
+      "status": "ok",
+      "rms_mmag": 4.2306439062497745,
+      "k": 15,
+      "n_common": 2932,
+      "bic": -2496.2996257347804,
+      "delta_bic": 0.0,
+      "two_component": false
+    },
+    {
+      "name": "h23_b1",
+      "config_hash": "3824843069a7",
+      "status": "ok",
+      "rms_mmag": 4.178197826564562,
+      "k": 19,
+      "n_common": 2932,
+      "bic": -2480.3310789822103,
+      "delta_bic": 15.968546752570091,
+      "two_component": false
+    }
+  ],
+  "ask_human": true,
+  "reasons": [
+    "failed candidates: h123_b0, h123_b1"
+  ],
+  "remarks": [
+    "eclipse centres shift between the halves (primary -51 s); opposite signs would point to spots"
+  ],
+  "n_eff": 235.87004925488,
+  "n_eff_measured": true,
+  "features_hash": "9e5b9342e1b3"
+}

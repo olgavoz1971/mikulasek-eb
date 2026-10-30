@@ -131,4 +131,4 @@ Reason for doing this first: the paper comparison must rest on an engine that do
 
 ## Phase 4: hypothesis rules and evidence stage (done)
 - `candidates.py`, `selection.py`, tests in `tests/test_selection.py`, spec section 11.
-- Open: n_eff for stars with no measurable correlation time (AR Aur); threshold calibration on more stars; script saving the selection summary.
+- Open: n_eff for stars with no measurable correlation time (AR Aur); threshold calibration on more stars; (script `examples/select_models.py` done; accepts any .vot path).
