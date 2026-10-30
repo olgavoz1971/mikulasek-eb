@@ -151,8 +151,8 @@ def test_real_stars_eclipse_character(name, separated, contact_candidate):
 
 
 def test_edge_level_does_not_change_the_ordering():
-    """AR Aur stays separated and the others stay continuous for edge levels 0.02 to 0.1."""
-    for level in (0.02, 0.05, 0.1):
+    """AR Aur stays separated and the others stay continuous for edge levels 0.05 and 0.1."""
+    for level in (0.05, 0.1):
         st = eb.FeatureSettings(edge_level=level)
         cov = {}
         for name in ("AR_Aur_sector_19", "AV_Del_sector_81", "EK_Com_sector_49"):
@@ -169,12 +169,47 @@ def test_edge_level_does_not_change_the_ordering():
         )
 
 
-def test_no_secondary_leaves_the_branch_undecided():
-    """V477 Lyr has no secondary eclipse: the contact candidate is None with a note."""
+def test_v477_lyr_shallow_secondary_is_found_with_a_local_depth():
+    """V477 Lyr: the secondary lies above the quadrature level but is a real, shallow dip."""
     p, t = _load("v477_Lyr_sector_26")
     f = eb.extract_features(t, p["mag"], p["sig"], p["period"], p["epoch_jd"])
-    assert f.variation["contact_candidate"] is None
+    g = f.geometry
+    assert g["A2_global"] < 0 < g["A2"]
+    assert g["A2"] == pytest.approx(0.07, abs=0.02)
+    assert abs(g["secondary_offset"]["value"]) < 0.02
+    assert f.variation["contact_candidate"] is False
+
+
+def test_secondary_search_reports_a_missing_secondary():
+    """A curve with a single eclipse gives A2 None and a note, not a made-up depth."""
+    rng = np.random.default_rng(6)
+    t = np.arange(58000.0, 58040.0, 10.0 / 1440.0)
+    t = t + rng.uniform(-3.0, 3.0, len(t)) / 1440.0
+    model = EBModel(1, (), False)
+    y = model(phase(t, M0, P), dict(A1=0.4, A2=0.0, D1=0.03, G1=2.0, C1=0.0))
+    y = y + rng.normal(0, 0.003, len(t))
+    f = eb.extract_features(t, y, np.full(len(t), 0.003), P, 2458000.7)
+    assert f.geometry["A2"] is None
     assert any(n.startswith("A2:") for n in f.notes)
+    assert f.variation["contact_candidate"] is None
+
+
+def test_gap_step_and_red_noise_are_measured():
+    """An instrumental step across a gap is found; white noise gives a red-noise ratio near 1."""
+    rng = np.random.default_rng(7)
+    t = np.arange(58000.0, 58030.0, 10.0 / 1440.0)
+    t = t + rng.uniform(-3.0, 3.0, len(t)) / 1440.0
+    t = t[(t < 58014.0) | (t > 58015.5)]
+    model = EBModel(1, (2,), False)
+    y = model(phase(t, M0, P), dict(TRUE, S1=0.0)) + rng.normal(0, 0.002, len(t))
+    y_step = y + np.where(t > 58015.0, 0.006, 0.0)
+    s = np.full(len(t), 0.002)
+    clean = eb.extract_features(t, y, s, P, 2458000.7)
+    stepped = eb.extract_features(t, y_step, s, P, 2458000.7)
+    assert abs(clean.residuals["gap_steps"][0]["step_mag"]) < 0.002
+    gs = stepped.residuals["gap_steps"][0]
+    assert gs["step_mag"] == pytest.approx(0.006, abs=0.0015)
+    assert clean.residuals["red_noise_ratio"] < 3
 
 
 def test_real_xy_boo_ephemeris_features_are_finite():

@@ -155,3 +155,21 @@ Changes (`FeatureSettings`):
 Results at `edge_level` 0.05: coverage AR Aur 0.11; AV Del 0.62; AA And 0.71; EK Com 0.76; XY Boo 0.80. Contact candidate: EK Com and XY Boo only. The ordering is the same for edge levels 0.02, 0.05, 0.1 (tested); at 0.2 AV Del drops to 0.33, close to the 0.3 threshold.
 
 Limits (honest): one star on the separated side, so the 0.3 threshold is only placed in the gap (0.11 to 0.62) and the 0.8 depth ratio in the gap (0.28 to 0.90). Another star (a detached twin with equal depths, e.g. AR Aur itself has A2/A1 = 0.86 but is separated) is handled by the coverage test first. A semi-detached system with a flat stretch and unequal depths would be "separated, not contact", which is what we want. I have no star yet that tests the boundary. The labels are my reading of the folds, not a catalogue classification.
+
+## 10. Local depth and trend diagnostics (2026-10-30)
+
+### Local-continuum depth (replaces the quadrature level for depths)
+The quadrature reference level fails when the out-of-eclipse variation is strong: the shallow secondary of V477 Lyr lies above that level (global depth -0.18 mag). Now:
+- The **local level** of an eclipse is the mean of the brightest fold values on its two sides, between `local_inner` (0.03) and `local_outer` (0.25) cycles from its centre. `A1`, `A2` are depths below that local level; `A1_global`, `A2_global` (below the quadrature level) are kept for reference. `level_mag` is the global level.
+- The **secondary** is the most prominent local flux minimum within `secondary_search` (0.2) of phase 0.5, accepted only if its prominence is at least `min_prominence_sigma` (5) median bin errors **and** it is at least `min_secondary_width_bins` (3) bins wide (a first version without the width test accepted a noise peak in a synthetic star). Otherwise `A2` is None with a note.
+- For the six calibrated stars the local and global depths differ by 1 to 3 percent, and `separated_eclipses` and `contact_candidate` are unchanged. V477 Lyr: A2 = 0.072 mag (A2/A1 = 0.12), FWHM 0.020, centre 0.0035 cycles before phase 0.5; the secondary-centre error is not available (the bottom parabola is not convex). Its contact candidate is False.
+- Edge-level sensitivity of the coverage (tested for 0.05 and 0.1): at 0.02 the AV Del eclipses fill the cycle (coverage 1.0, edge not reached), so the ordering AV Del below EK Com does not hold at that level.
+
+### Trend diagnostics (replace `trend_order_hint`)
+In TESS data the slow structure is mostly instrumental, so the features only describe it and make no model choice. The polynomial BIC under a white-noise assumption always chose the maximum order and is removed (`trend_max_order`, `trend_order_hint`, `trend_bic`).
+- `trend_amplitude_mag`, `trend_over_depth`: largest peak-to-peak of the residual medians in time bins of `trend_bin_days` (1 d, rounded to whole cycles, at least one) per gap segment.
+- `red_noise_ratio`: rms of those medians over the white-noise expectation. Values of 7 to 60 on all stars mean the residuals are far from white; it is a comparison number, not a test.
+- `correlation_time_days`, `n_effective`: first lag where the autocorrelation of finely binned residuals drops below 0.5, and the span over that time. None if it never does within half the longest segment (AR Aur, with a note).
+- `gap_steps`: for every gap longer than `gap_days`, the difference of the residual medians over `step_window_days` (whole cycles) after and before the gap, with its error. The unit tests recover an injected 6 mmag step.
+- Observation: V477 Lyr has a step of 9.8 +- 2.0 mmag at its gap (instrumental); the other stars show steps of 0 to 2.5 mmag.
+- The baseline order itself will be decided in the evidence stage with `n_effective` (section 5), not here.

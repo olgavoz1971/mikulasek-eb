@@ -81,7 +81,14 @@ def main() -> None:
                 shift("primary"),
                 shift("secondary"),
                 fmt(r["fold_scatter_ratio"]),
-                fmt(r["trend_order_hint"]),
+                fmt(r["trend_amplitude_mag"]),
+                fmt(r["red_noise_ratio"]),
+                fmt(r["correlation_time_days"]),
+                "; ".join(
+                    f"{1e3 * g['step_mag']:.1f}+-{1e3 * g['err_mag']:.1f}"
+                    for g in r["gap_steps"]
+                )
+                or "-",
             ]
         )
         notes.append(
@@ -105,7 +112,10 @@ def main() -> None:
         "drift prim. (s)",
         "drift sec. (s)",
         "fold scatter/noise",
-        "trend order",
+        "trend amp. (mag)",
+        "red/white",
+        "corr. time (d)",
+        "gap steps (mmag)",
     ]
     lines = ["# Features of the light curves in data/", ""]
     lines.append("| " + " | ".join(head) + " |")

@@ -21,6 +21,8 @@ from functools import lru_cache
 
 import numpy as np
 
+from scipy.signal import find_peaks
+
 from .api import validate_lightcurve
 from .errors import ConfigError, InvalidLightCurve
 from .exposure import estimate_cadence_days, estimate_exposure_days
@@ -51,6 +53,16 @@ class FeatureSettings:
         vertex_core_frac (float): Bins deeper than this fraction of the depth enter the
             parabola that gives the eclipse centre.
         bottom_core_frac (float): Same, for the bottom curvature feature.
+        local_inner (float): Distance (cycles) from the eclipse centre where the search for
+            the local continuum begins.
+        local_outer (float): Distance where it ends. The local level of an eclipse is the
+            mean of the brightest fold values on its two sides in this range.
+        secondary_search (float): Half-width (cycles) around phase 0.5 in which the
+            secondary eclipse is searched.
+        min_prominence_sigma (float): The secondary must stand out from its shoulders by
+            this many median bin errors.
+        min_secondary_width_bins (float): and be at least this many bins wide at half its
+            prominence (noise peaks are a bin or two wide).
         edge_level (float): The eclipse edge is where the eclipse is this fraction of its
             depth (0.05 means the eclipse has fallen to 5 percent of its depth).
         window_margin (float): Eclipse window half-width = margin times half the edge width.
@@ -60,8 +72,11 @@ class FeatureSettings:
         equal_depth_ratio (float): Depths are called equal if A2 / A1 is at least this.
         harmonics_max (int): Highest harmonic of the out-of-eclipse fit.
         gap_days (float): Gaps longer than this split the baseline segments.
-        trend_max_order (int): Highest polynomial degree tried per segment.
-        trend_window_periods (float): Time-bin width (periods) for the trend amplitude.
+        step_window_days (float): Window before and after a gap (rounded to whole cycles)
+            in which the residual medians are compared to measure the step across it.
+        min_step_points (int): Minimum points on each side of a gap for a step.
+        trend_bin_days (float): Time-bin width for the trend amplitude and the red-noise
+            ratio, rounded to a whole number of cycles (at least one).
         outlier_nsig (float): Threshold of the outlier fraction (robust sigmas).
         gamma_match_tol (float): Largest accepted distance of the Gamma lookup match.
         parity_window_fwhm (float): Half-width (FWHM) of the odd/even depth windows.
@@ -73,6 +88,11 @@ class FeatureSettings:
     core_halfmax: float = 0.25
     vertex_core_frac: float = 0.8
     bottom_core_frac: float = 0.9
+    local_inner: float = 0.03
+    local_outer: float = 0.25
+    secondary_search: float = 0.2
+    min_prominence_sigma: float = 5.0
+    min_secondary_width_bins: float = 3.0
     edge_level: float = 0.05
     window_margin: float = 1.0
     flat_bottom_ratio: float = 0.6
@@ -80,8 +100,9 @@ class FeatureSettings:
     equal_depth_ratio: float = 0.8
     harmonics_max: int = 4
     gap_days: float = 0.5
-    trend_max_order: int = 3
-    trend_window_periods: float = 2.0
+    step_window_days: float = 1.0
+    min_step_points: int = 10
+    trend_bin_days: float = 1.0
     outlier_nsig: float = 5.0
     gamma_match_tol: float = 0.15
     parity_window_fwhm: float = 0.25
@@ -306,26 +327,86 @@ def _level(fold: _Fold, centre: float, st: FeatureSettings) -> float:
     return float(np.mean(out))
 
 
-def _measure_eclipse(fold: _Fold, nominal: float, level: float, st: FeatureSettings):
+def _local_level(fold: _Fold, centre: float, st: FeatureSettings) -> float:
+    """Local continuum of an eclipse: mean of the brightest fold values on its two sides.
+
+    Args:
+        fold (_Fold): Median fold.
+        centre (float): Phase of the eclipse minimum.
+        st (FeatureSettings): Settings (``local_inner``, ``local_outer``).
+
+    Returns:
+        float: Local level (mag; smaller is brighter).
+    """
+    d = np.linspace(st.local_inner, st.local_outer, 2000)
+    return float(0.5 * (fold.at(centre - d).min() + fold.at(centre + d).min()))
+
+
+def _find_secondary(fold: _Fold, st: FeatureSettings):
+    """Phase of the most prominent local flux minimum (magnitude maximum) near 0.5.
+
+    Args:
+        fold (_Fold): Median fold with the primary at phase 0.
+        st (FeatureSettings): Settings.
+
+    Returns:
+        tuple: (phase or None, reason or None).
+    """
+    grid = 0.5 + np.linspace(-st.secondary_search, st.secondary_search, 8001)
+    y = fold.at(grid)
+    step = grid[1] - grid[0]
+    nb = len(fold.centres)
+    peaks, props = find_peaks(
+        y, prominence=0.0, width=st.min_secondary_width_bins / nb / step
+    )
+    if len(peaks) == 0:
+        return (
+            None,
+            "no local minimum of the flux near phase 0.5 that is wider than noise",
+        )
+    k = int(np.argmax(props["prominences"]))
+    prominence = float(props["prominences"][k])
+    floor = st.min_prominence_sigma * float(np.median(fold.err))
+    if prominence < floor:
+        return None, (
+            f"most prominent local minimum near 0.5 stands {prominence:.4f} mag above "
+            f"its shoulders, below {st.min_prominence_sigma:g} bin errors ({floor:.4f})"
+        )
+    return float(grid[peaks[k]]), None
+
+
+def _measure_eclipse(
+    fold: _Fold,
+    nominal: float,
+    level: float,
+    st: FeatureSettings,
+    search: float = 0.15,
+):
     """Depth and bottom parabola of the eclipse expected near ``nominal``.
 
     Args:
         fold (_Fold): Median fold.
         nominal (float): Expected phase of the minimum.
-        level (float): Reference level (mag).
+        level (float): Global reference level (mag), used for ``depth_global``.
         st (FeatureSettings): Settings.
+        search (float): The faintest point within this distance of ``nominal`` is taken.
 
     Returns:
-        dict: depth, peak_phase, and (when a convex-down parabola of at least 5 bins
+        dict: depth (below the local continuum), depth_global (below ``level``),
+        local_level, peak_phase, and (when a convex-down parabola of at least 5 bins
         could be fitted) vertex, vertex_err, curvature, curvature_err, n_core, else
         those entries are None and ``reason`` explains.
     """
-    grid = nominal + np.linspace(-0.15, 0.15, 3001)
+    grid = nominal + np.linspace(-search, search, 3001)
     y = fold.at(grid)
     i = int(np.argmax(y))
-    peak_phase, depth = float(grid[i]), float(y[i] - level)
+    peak_phase = float(grid[i])
+    local = _local_level(fold, peak_phase, st)
+    depth = float(y[i] - local)
     out = dict(
         depth=depth,
+        depth_global=float(y[i] - level),
+        local_level=local,
         peak_phase=peak_phase,
         vertex=None,
         vertex_err=None,
@@ -335,9 +416,9 @@ def _measure_eclipse(fold: _Fold, nominal: float, level: float, st: FeatureSetti
         reason=None,
     )
     if depth <= 0:
-        out["reason"] = "no minimum deeper than the reference level"
+        out["reason"] = "no minimum deeper than its local continuum"
         return out
-    out.update(_core_parabola(fold, peak_phase, level, depth, st.vertex_core_frac, st))
+    out.update(_core_parabola(fold, peak_phase, local, depth, st.vertex_core_frac, st))
     return out
 
 
@@ -522,8 +603,16 @@ def extract_features(
     A1 = prim["depth"]
     if A1 <= 0:
         raise InvalidLightCurve("The folded curve has no primary eclipse.")
-    sec = _measure_eclipse(fold, 0.5, level, st)
-    A2 = sec["depth"] if sec["depth"] > 0 else None
+    lev1 = prim["local_level"]
+    sec_phase, sec_reason = _find_secondary(fold, st)
+    if sec_phase is None:
+        sec = dict(depth=0.0, reason=sec_reason, vertex=None, vertex_err=None)
+        A2 = None
+        lev2 = None
+    else:
+        sec = _measure_eclipse(fold, sec_phase, level, st, search=0.01)
+        A2 = sec["depth"] if sec["depth"] > 0 else None
+        lev2 = sec["local_level"]
     m0_mjd = t[0] + c_abs * P
     m0_mjd += P * round((t.mean() - m0_mjd) / P)
 
@@ -569,13 +658,17 @@ def extract_features(
     )
 
     # --- B: geometry
-    fw1 = _width(fold, 0.0, level + 0.5 * A1)
+    fw1 = _width(fold, 0.0, lev1 + 0.5 * A1)
     fw2 = None
-    sec_centre = sec["vertex"] if sec["vertex"] is not None else sec["peak_phase"]
+    sec_centre = (
+        None
+        if sec_phase is None
+        else (sec["vertex"] if sec["vertex"] is not None else sec["peak_phase"])
+    )
     if A2 is None:
         none("A2", sec["reason"])
     else:
-        fw2 = _width(fold, sec_centre, level + 0.5 * A2)
+        fw2 = _width(fold, sec_centre, lev2 + 0.5 * A2)
         if fw2 is None:
             none("fwhm2", "secondary does not reach half depth within half a cycle")
     if fw1 is None:
@@ -592,6 +685,8 @@ def extract_features(
         level_mag=float(level),
         A1=float(A1),
         A2=None if A2 is None else float(A2),
+        A1_global=float(prim["depth_global"]),
+        A2_global=None if A2 is None else float(sec["depth_global"]),
         depth_ratio=None if A2 is None else float(A2 / A1),
         secondary_offset=sec_off,
         fwhm1=fw1,
@@ -606,14 +701,14 @@ def extract_features(
     )
 
     # --- C: shape
-    w = {q: _width(fold, 0.0, level + q * A1) for q in (0.9, 0.5, 0.1)}
+    w = {q: _width(fold, 0.0, lev1 + q * A1) for q in (0.9, 0.5, 0.1)}
     bottom_ratio = None if w[0.9] is None or w[0.5] is None else float(w[0.9] / w[0.5])
     wing_ratio = None if w[0.1] is None or w[0.5] is None else float(w[0.1] / w[0.5])
     if bottom_ratio is None:
         none("bottom_ratio", "W90 or W50 of the primary not measurable")
     if wing_ratio is None:
         none("wing_ratio", "W10 or W50 of the primary not measurable")
-    core = _core_parabola(fold, 0.0, level, A1, st.bottom_core_frac, st)
+    core = _core_parabola(fold, 0.0, lev1, A1, st.bottom_core_frac, st)
     if core["curvature"] is None:
         none("bottom_curvature", core["reason"])
     gamma = dist = None
@@ -652,8 +747,8 @@ def extract_features(
     # --- D: out-of-eclipse variation
     grid = np.linspace(0.0, 1.0, 2000, endpoint=False)
     coverage = ooe_ratio = harmonics = None
-    edge1 = _width(fold, 0.0, level + st.edge_level * A1)
-    edge2 = None if A2 is None else _width(fold, sec_centre, level + st.edge_level * A2)
+    edge1 = _width(fold, 0.0, lev1 + st.edge_level * A1)
+    edge2 = None if A2 is None else _width(fold, sec_centre, lev2 + st.edge_level * A2)
     if A2 is not None:
         # an eclipse whose edge is not reached within half a cycle fills the cycle
         half1 = 0.5 if edge1 is None else st.window_margin * edge1 / 2
@@ -771,7 +866,10 @@ def extract_features(
             continue
         res = {}
         for name, nominal in (("primary", 0.0), ("secondary", sec_centre)):
-            m = _measure_eclipse(fh, nominal, lev, st)
+            if nominal is None:
+                res[name] = None
+                continue
+            m = _measure_eclipse(fh, nominal, lev, st, search=0.03)
             res[name] = m if m["vertex"] is not None else None
         halves[label] = dict(res, t_med=float(np.median(t[sel])))
     drift = {}
@@ -796,7 +894,7 @@ def extract_features(
 
     # --- F: residual structure
     seg = np.cumsum(np.r_[0, dt > st.gap_days])
-    width = st.trend_window_periods * P
+    width = max(1, int(round(st.trend_bin_days / P))) * P
     amp = []
     for sg in np.unique(seg):
         m = seg == sg
@@ -806,23 +904,87 @@ def extract_features(
         ]
         if len(meds) >= 3:
             amp.append(float(np.ptp(meds)))
-    bic = {}
-    for order in range(st.trend_max_order + 1):
-        chi2 = 0.0
-        for sg in np.unique(seg):
-            m = seg == sg
-            u = 2 * (t[m] - t[m][0]) / max(np.ptp(t[m]), 1e-9) - 1
-            X = np.vander(u, order + 1, increasing=True)
-            c, *_ = np.linalg.lstsq(X, resid[m], rcond=None)
-            chi2 += float(np.sum(((resid[m] - X @ c) / sigma_noise) ** 2))
-        bic[order] = chi2 + (order + 1) * len(np.unique(seg)) * np.log(len(t))
+    # red noise: scatter of the binned residuals against the white-noise expectation
+    binned, expected = [], []
+    for sg in np.unique(seg):
+        m = seg == sg
+        tb = np.floor((t[m] - t[m][0]) / width).astype(int)
+        for b_ in np.unique(tb):
+            sel = tb == b_
+            if sel.sum() >= 3:
+                binned.append(np.median(resid[m][sel]))
+                expected.append(MEDIAN_ERROR_FACTOR * sigma_noise / np.sqrt(sel.sum()))
+    red_ratio = (
+        float(np.std(binned) / np.median(expected))
+        if len(binned) >= 3
+        else none("red_noise_ratio", "fewer than 3 time bins")
+    )
+    # correlation time from the autocorrelation of finely binned residuals within segments
+    tau = none_tau = None
+    w_fine = max(3 * (cadence_d or 0.0), P / 10.0)
+    series = []
+    for sg in np.unique(seg):
+        m = seg == sg
+        tb = np.floor((t[m] - t[m][0]) / w_fine).astype(int)
+        nbins_s = tb.max() + 1
+        v = np.full(nbins_s, np.nan)
+        for b_ in np.unique(tb):
+            sel = tb == b_
+            if sel.sum() >= 2:
+                v[b_] = np.median(resid[m][sel])
+        series.append(v)
+    all_vals = np.concatenate([v[np.isfinite(v)] for v in series])
+    if len(all_vals) >= 10 and cadence_d is not None:
+        mu, var = all_vals.mean(), all_vals.var()
+        max_lag = max(len(v) for v in series) // 2
+        for lag in range(1, max_lag):
+            num, cnt = 0.0, 0
+            for v in series:
+                a_, b2 = v[:-lag], v[lag:]
+                ok = np.isfinite(a_) & np.isfinite(b2)
+                num += np.sum((a_[ok] - mu) * (b2[ok] - mu))
+                cnt += int(ok.sum())
+            if cnt < 10:
+                break
+            if num / cnt / var < 0.5:
+                tau = lag * w_fine
+                break
+        if tau is None:
+            none_tau = "autocorrelation stays above 0.5 over half the longest segment"
+            notes.append(f"correlation_time_days: {none_tau}")
+    else:
+        notes.append("correlation_time_days: too few residual bins or no cadence")
+    span = float(t[-1] - t[0])
+    # steps across gaps
+    steps = []
+    n_cyc = max(1, int(round(st.step_window_days / P)))
+    for i in np.where(dt > st.gap_days)[0]:
+        before = (t > t[i] - n_cyc * P) & (t <= t[i])
+        after = (t >= t[i + 1]) & (t < t[i + 1] + n_cyc * P)
+        if before.sum() < st.min_step_points or after.sum() < st.min_step_points:
+            notes.append(
+                f"gap_step at MJD {t[i]:.2f}: fewer than {st.min_step_points} points on a side"
+            )
+            continue
+        step = float(np.median(resid[after]) - np.median(resid[before]))
+        err = float(np.hypot(_median_error(resid[after]), _median_error(resid[before])))
+        steps.append(
+            dict(
+                mjd=float(0.5 * (t[i] + t[i + 1])),
+                gap_days=float(dt[i]),
+                step_mag=step,
+                err_mag=err,
+            )
+        )
+    trend_amp = max(amp) if amp else none("trend_amplitude", "segments too short")
     residuals = dict(
         fold_scatter_ratio=float(mad_res / sigma_noise),
-        trend_amplitude_mag=(
-            max(amp) if amp else none("trend_amplitude", "segments too short")
-        ),
-        trend_order_hint=int(min(bic, key=bic.get)),
-        trend_bic={str(k): float(v) for k, v in bic.items()},
+        trend_amplitude_mag=trend_amp,
+        trend_over_depth=None if trend_amp is None else float(trend_amp / A1),
+        red_noise_ratio=red_ratio,
+        correlation_time_days=tau,
+        n_effective=None if tau is None else float(span / max(tau, w_fine)),
+        gap_steps=steps,
     )
 
     prov = dict(
