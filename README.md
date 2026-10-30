@@ -38,3 +38,7 @@ Without installing, `PYTHONPATH=src` works for the scripts; pytest uses `pythonp
 ## Status
 
 Early development. See `todo.md` for the plan and progress log.
+
+## Licence
+
+MIT, see `LICENSE`.
