@@ -55,12 +55,12 @@ how the brightness drops and recovers. That row is what we call a
 | 6 | A triangle | D only |
 | 7 | exp(1 - cosh), no Gamma | D only |
 
-**Yes: a profile is one row of that table.**
+**A profile is one row of that table.**
 
-**Yes: all seven rows are implemented** in `EBModel`. You can ask the engine
+**All seven profiles are implemented** in `EBModel`. You can ask the engine
 to fit any of them by setting `ModelSpec(profile=...)`.
 
-**No: the automatic script does not use three of them.** Today
+**So far the automatic script use only one of them.** Today
 `propose_candidates` always sets **profile 1**. Profiles 2 to 7 are in the
 package, but `diagnose_fit.py` / `select_model` never offer them. The staged
 pipeline can fit profiles 1 to 4 (they have Gamma). Profiles 5 to 7 exist in

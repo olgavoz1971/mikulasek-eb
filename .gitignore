@@ -4,4 +4,4 @@ __pycache__/
 .venv/
 # Publisher PDF: keep a local copy, do not redistribute
 *.pdf
-*.skill
+*~
