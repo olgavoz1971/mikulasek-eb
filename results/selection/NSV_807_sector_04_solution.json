@@ -1,0 +1,112 @@
+{
+  "schema_version": 1,
+  "config": {
+    "schema_version": 1,
+    "model": {
+      "profile": 1,
+      "harmonics": [
+        2,
+        3
+      ],
+      "ocon": true,
+      "kterm": false
+    },
+    "data": {
+      "baseline_order": 1,
+      "gap_split_days": 0.5,
+      "exposure_days": 0.020832910668104887,
+      "exposure_nsub": null
+    },
+    "policy": {
+      "gamma_starts": [
+        0.5,
+        1,
+        2,
+        4,
+        8
+      ],
+      "separate_shape_chi2_frac": 0.01,
+      "clip_nsig": 5.0,
+      "allow_two_component": true,
+      "rms_noise_two_comp_threshold": 1.5,
+      "eclipse_weight": 1.0,
+      "eclipse_phase_half": 0.12,
+      "min_points_per_fwhm": 8.0,
+      "primary_a2_over_a1_min_ratio": 1.2,
+      "two_comp_min_rms_gain_frac": 0.25,
+      "two_comp_min_agreeing_starts": 2,
+      "two_comp_max_rel_err": 0.5,
+      "two_comp_eclipses": [
+        1
+      ],
+      "two_comp_timing_agreement_sigma_max": 1.0
+    },
+    "timing": {
+      "window": 0.25,
+      "baseline_order": 1,
+      "max_sigma_factor": 5.0,
+      "require_contact_walls": true,
+      "clip_outliers": true,
+      "local_windows": [
+        0.15,
+        0.1,
+        0.06
+      ],
+      "template": "own"
+    },
+    "notes": ""
+  },
+  "params": {
+    "A1": 0.5649289799578989,
+    "A2": 0.47300000760572036,
+    "D1": 0.05807892343032702,
+    "G1": 0.5112359446200239,
+    "C1": 0.0,
+    "D2": 0.054808089301172314,
+    "G2": 0.525510113782865,
+    "C2": 0.0,
+    "H2": 0.12069899967903829,
+    "H3": -0.004155987809636245,
+    "S1": -0.02137872036300487
+  },
+  "errors": {
+    "A1": 0.0041478440295228255,
+    "A2": 0.004290416421639259,
+    "D1": 0.00036892723805606614,
+    "G1": 0.009638904581663612,
+    "D2": 0.0004368088749659157,
+    "G2": 0.012440578808586986,
+    "H2": 0.0007089887871355542,
+    "H3": 0.00021590641024725633,
+    "S1": 0.00015277688312344788,
+    "M0": 0.0003801427027538116,
+    "P0": 6.131315187332446e-07
+  },
+  "ephemeris": {
+    "M0": 58423.85384631359,
+    "P0": 0.3389604416751941,
+    "Pdot": 0.0
+  },
+  "stats": {
+    "chi2": 0.45359259620645487,
+    "dof": 1027,
+    "rchi2": 0.00044166757176869996,
+    "rms_mag": 0.004269057325799286,
+    "noise_floor_mag": 0.04585268498119245,
+    "rms_over_noise": 0.09310375886494628,
+    "n_points": 1044,
+    "n_input": 1046,
+    "rank_deficient": false,
+    "two_component": false
+  },
+  "exposure": {
+    "days": 0.020832910668104887,
+    "nsub": 5
+  },
+  "provenance": {
+    "data_id": "NSV 807 S04",
+    "epoch_jd": 2457711.8539,
+    "period_input_days": 0.3389614,
+    "package_version": "0.1.0"
+  }
+}

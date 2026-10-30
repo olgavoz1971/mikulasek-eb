@@ -25,6 +25,7 @@ STARS = {
     "V477 Lyr S26": "v477_Lyr_sector_26",
     "AV Del S81": "AV_Del_sector_81",
     "AR Aur S19": "AR_Aur_sector_19",
+    "NSV 807 S04": "NSV_807_sector_04",
 }
 
 
