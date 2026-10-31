@@ -181,3 +181,12 @@ Scripts: `examples/score_synthetic_shape.py` (true trend removed, baseline order
 - G4 (Algol): p1 6.84, p2 6.84, p3 5.27, p4 7.11 (two-component).
 - G6 (spot, O'Connell): p1 3.86, p2 3.86, p3 3.30, p4 5.12.
 - Profile 2 equals profile 1 where C is not needed; profile 3 helps G4 and G6 but hurts G2; no profile reaches 1 to 2 mmag on G4/G6. One file each, so only a pointer for the tiered search.
+
+## Where the G4 shape error sits (2026-10-31)
+`examples/diagnose_synthetic_profiles.py G4_B08 [profile:harmonics:ocon[:2] ...]`, pictures in `results/synthetic_scoring/profile_pictures/` (`:2` forces the two-component trial with a 1% gain threshold). Error zones (mmag, 600 s, trend removed):
+- profile 1, h123: primary core 19.9, primary wings 8.9, secondary 1.2, out of eclipse 0.9. The error is a ringing of +-25 mmag inside +-0.1 phase of the deep primary (1.65 mag); nothing outside.
+- profile 3, h123: primary core 10.8, wings 9.7, but secondary 3.3 and out of eclipse 2.4 get worse.
+- profile 1, h123, two-component forced: primary core 2.4, wings 4.1, secondary 1.2-1.5, out of eclipse 1.3.
+- The two-component fit was tried by the pipeline and rejected: rms gain 14% < 25% criterion (`two_comp_min_rms_gain_frac`). The rms is dominated by the 11 mmag noise, so a 20 mmag structured error confined to 10% of the phase barely changes it. The acceptance test is blind to shape errors at this noise level.
+- O'Connell on/off gives identical results for G4 (S1 is about 0).
+- Candidate rule to test: judge two-component acceptance on the rms inside the eclipse windows (or on binned residuals), not on the whole-curve rms; calibrate on all synthetic files.
