@@ -129,6 +129,16 @@ pure curve.
 
 ## Things to check before you hand the files back
 
+Run the checker on every file (it reads the pure curve named by `source_file`
+from the same folder). It must report no FAIL, and every WARN must be fixed or
+explained to the developer:
+
+```bash
+PYTHONPATH=<mikulasek_eb>/src python <mikulasek_eb>/working_scripts/check_synthetic_lc.py file1.vot file2.vot
+```
+
+The checks it makes:
+
 - Every file loads with `volightcurve.read_lightcurve` with no error and with an
   empty `conversion_problems`.
 - The photometry table still has exactly one flux column and one flux-error
