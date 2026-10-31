@@ -165,3 +165,12 @@ Script `examples/score_synthetic_fits.py` (library: harmonics x baseline 0/1 x O
 - Baseline order 1 always beats 0 by about 1 mmag in truth, and BIC prefers 1 by about 220: the generator trends are not constant.
 - G1/G8 proposals are `h_b*` (no harmonics); the library lacked the empty set until now, so rerun G1 and G8 to include it.
 - h123_* failed to converge in some detached files (known problem).
+
+## Scoring harness, steps 2b and 3 (2026-10-31)
+Scripts: `examples/score_synthetic_shape.py` (true trend removed, baseline order 0, 600 s files), `examples/score_synthetic_timing.py` (selector over baseline-1 library without O'Connell, default timing recipe, truth `T_min_pure`). Tables in `results/synthetic_scoring/`.
+- Shape error alone (mmag, noise 11): G1 1.4, G8 1.2, G2 2.1, G5 2.3, G6 3.9, G4 6.8. Most of the earlier 3 to 7 mmag was the trend that the order-1 baseline cannot follow; G4 stays bad even without the trend (profile 1 limit). h123 fails to converge in several files.
+- Timing, detached and contact without spots: bias within 7 s at 120 and 600 s, scatter 8 to 30 s, honesty 0.65 to 1.0 (errors slightly conservative). At 1800 s bias reaches 10 to 22 s, and for G5 B12, G6 B15 and G8 B21 (primary) no event is timed.
+- G4 secondary: scatter 80 to 300 s (primary 8 to 28 s); honesty 1.1 to 1.4, errors slightly optimistic. Shallow, asymmetric eclipse.
+- G6 (spot and O'Connell): bias +82 s (primary) and -98 s (secondary) against T_min_pure; T_conj - T_min_pure is +170 and -189 s. The O'Connell candidate was not in this timing library, so rerun with it on.
+- G8 secondary bias -28 s (120 s file) to +98 s (1800 s file), not significant against the scatter 45 to 160 s.
+- Not done: circular against eccentric comparison; G7 (period commensurate); rerun G1 and G8 with the empty harmonic set.
