@@ -70,6 +70,8 @@ class SelectionResult:
         features (Features): The measured features.
         n_eff (float): Effective number of points used in the BIC.
         n_eff_measured (bool): False if ``n_eff`` is just the number of points.
+        candidates (list): The candidates that were tried.
+        fits (dict): ``FitOutput`` of every candidate that fitted, by name (not serialised).
     """
 
     best: Candidate | None
@@ -82,6 +84,7 @@ class SelectionResult:
     n_eff: float
     n_eff_measured: bool = True
     candidates: list = field(default_factory=list)
+    fits: dict = field(default_factory=dict)
 
     def to_dict(self) -> dict:
         """Light, JSON-compatible summary (no arrays, no fit objects).
@@ -186,7 +189,7 @@ def select_model(
     if not ok:
         reasons = ask + ["every candidate failed to fit"]
         return SelectionResult(
-            None, None, table, True, reasons, remarks, feats, float("nan"), False, cands
+            None, None, table, True, reasons, remarks, feats, float("nan"), False, cands, fits
         )
     # common points
     common = None
@@ -244,4 +247,5 @@ def select_model(
         n_eff,
         measured,
         cands,
+        fits,
     )

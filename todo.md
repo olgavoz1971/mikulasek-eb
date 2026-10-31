@@ -156,3 +156,12 @@ Script `examples/score_synthetic_features.py`, table `results/synthetic_scoring/
 - FWHM measured is systematically smaller than the label (-5 to -25%), worst for G4 primary (-23%) and contact (-12 to -18%). Check the label definition (flux or magnitude, level used) before blaming the features.
 - FWHM ratio: G4 measured 1.26-1.49 vs label 1.07; G8 1.6 vs 1.48.
 - Secondary offset (phase): G8 is about 0 although eccentric, so omega is probably near 90 deg (check generator).
+
+## Scoring harness, step 2 (fits vs truth), 2026-10-31
+Script `examples/score_synthetic_fits.py` (library: harmonics x baseline 0/1 x O'Connell on/off; the selector chooses among them), results in `results/synthetic_scoring/fits_vs_truth.{md,csv}`. Run took about 40 min for 19 files (`--resummarise` rebuilds the table from the CSV).
+- Metric: rms of (fit - noise-free observation) in mmag; noise floor 10.8 mmag everywhere.
+- The selector's choice is within 0.02 mmag of the best library member in every file (regret about 0). The ask_human flag is always yes (dBIC < 10 between near-identical candidates).
+- Absolute error is not noise-limited: G1/G8 3.1 to 3.7 mmag, G2 5.3, G5 6.2, G6 7.5, G4 20 mmag. G4 (Algol, shallow secondary, narrow primary) is a real model failure of profile 1; the 3 to 7 mmag of the others includes the trend the linear baseline cannot follow, so shape and trend must be separated (next).
+- Baseline order 1 always beats 0 by about 1 mmag in truth, and BIC prefers 1 by about 220: the generator trends are not constant.
+- G1/G8 proposals are `h_b*` (no harmonics); the library lacked the empty set until now, so rerun G1 and G8 to include it.
+- h123_* failed to converge in some detached files (known problem).
