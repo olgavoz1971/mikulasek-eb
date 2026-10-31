@@ -148,3 +148,11 @@ Reason for doing this first: the paper comparison must rest on an engine that do
 - 2026-10-31: synthetic calibration plan agreed (`docs/synthetic_calibration_plan.md`): about 13 PHOEBE systems, TESS cadences 120/600/1800 s, 27 days, one gap, noise and trends; truth is the pure curve; times truth stored as T_conj and T_min_pure; O-C = 0 first; circular and eccentric timed and compared. Waiting for the files.
 - 2026-10-31: `synthetic_check.py` + `working_scripts/check_synthetic_lc.py` (checker for generator output, 24 tests). First file (contact S05 c600): 18 pass, 5 warn (trend amplitude definition, depth value, conj_minus_min_pure_s only primary, no per-eclipse flags, smear_nsub), 0 fail.
 - 2026-10-31: first synthetic batch (21 accepted rows + B22 with period_eps 1e-4) from LC_Generator. Checker fixed: truth checks use P_true (not the table P_meta) for conjunction times and the smeared truth; B22 now passes. All 22 files: 0 fail; only warn is G4 (Algol) secondary T_min_pure - T_conj = +1.47 s. Independent bisector of the pure G4 curve: secondary midpoints vary from 1 to 5 s with the level used (primary: about 0 +- 1 s), so the secondary eclipse is slightly asymmetric and the "true minimum" is ambiguous at the few-second level for that system; accepted, scoring should allow about 3 s there. Next: scoring harness (features vs truth, then candidates/regret, then timings).
+
+## Scoring harness, step 1 (features vs generator labels), 2026-10-31
+Script `examples/score_synthetic_features.py`, table `results/synthetic_scoring/features_vs_labels.md`.
+- 19 of 22 files measured; G7 B16-B18 fail: P = 0.5 d is exactly 72/360/24 cadences, so the phase samples only 72 distinct values (fold sparse). Generator should use a non-commensurate period.
+- Depth A1 (smeared, noisy data) vs label (pure): within 1% at 120 s, up to -10% at 1800 s (smearing, 3 points per FWHM).
+- FWHM measured is systematically smaller than the label (-5 to -25%), worst for G4 primary (-23%) and contact (-12 to -18%). Check the label definition (flux or magnitude, level used) before blaming the features.
+- FWHM ratio: G4 measured 1.26-1.49 vs label 1.07; G8 1.6 vs 1.48.
+- Secondary offset (phase): G8 is about 0 although eccentric, so omega is probably near 90 deg (check generator).
