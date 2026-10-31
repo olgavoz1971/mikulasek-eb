@@ -204,3 +204,16 @@ Added `FitPolicy.force_two_component` (trial always runs, rms-gain criterion dro
 - Never adopted wrongly in G1, G8, G2 (G2 1800 s: twin is 0.1 mmag better but dBIC +2.3, BIC keeps single).
 - G4 1800 s: not adopted (3 points per FWHM, no information).
 - Tooling lesson: waiting with `while pgrep -f <script>` hangs because pgrep matches its own command line; use a PID or a log marker.
+
+## Plan after the first scoring round (LC_Modeller, 2026-10-31; for discussion with the researcher)
+State: selector regret about 0; trend dominates the truth error; detached shape error 1.2 to 1.4 mmag; G4 needs the second component (BIC picks it); timing good for detached and contact at 120/600 s, poor for G4 secondary, biased for G6; `ask_human` always yes (no information).
+Order proposed:
+1. Trend handling (largest remaining error): check which trends the generator applies (ramp, step, drift); test baseline order 2 and a split per TESS orbit on the synthetic files. Serves real stars too.
+2. Two-component and O'Connell in the default proposals: switch on `two_component_candidates`; decide O'Connell by evidence instead of the maxima-significance rule (G6 needs it).
+3. Calibrate `ask_human` with dBIC and selector regret: flag only when candidates differ in truth error, not for near-duplicates.
+4. Timing recheck with the new selection: G4 and G6 with second component and O'Connell on; circular against eccentric on G8; T_conj offset for G6.
+5. Hold-out: request part of the generator bulk (S01-S18) only after steps 1 to 3.
+6. Rerun the 8 real TESS stars with the new defaults and compare with the earlier results and pictures.
+7. Profiles 5 to 7 (need `fit_global`): low priority, only if something still fails.
+Open, not ours to decide: G7 needs a non-commensurate period and the generator owes the FWHM label definition; pushing the ~20 local commits is the researcher's call.
+Questions to the researcher: trend first or `ask_human` first? Should real stars fit the trend by default (baseline order 1 or 2) or expose it as a visible config choice?
