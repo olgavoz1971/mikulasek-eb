@@ -190,3 +190,10 @@ Scripts: `examples/score_synthetic_shape.py` (true trend removed, baseline order
 - The two-component fit was tried by the pipeline and rejected: rms gain 14% < 25% criterion (`two_comp_min_rms_gain_frac`). The rms is dominated by the 11 mmag noise, so a 20 mmag structured error confined to 10% of the phase barely changes it. The acceptance test is blind to shape errors at this noise level.
 - O'Connell on/off gives identical results for G4 (S1 is about 0).
 - Candidate rule to test: judge two-component acceptance on the rms inside the eclipse windows (or on binned residuals), not on the whole-curve rms; calibrate on all synthetic files.
+
+## Two components as a candidate (2026-10-31)
+`examples/score_synthetic_twocomp.py` (600 s files, with trend, baseline 1, no O'Connell, harmonics 2/23/123; each fitted `single` and `two` = trial forced with threshold 0 and gain 1%, other acceptance checks kept; BIC chooses). Table `results/synthetic_scoring/twocomp_vs_truth.md`.
+- BIC picks the two-component fit only where it was adopted: G4 (dBIC -240 against the best single). Everywhere else the forced trial was not adopted (other checks refuse it), so single and two are the same fit: no false two-component acceptance on G1, G2, G5, G6, G8.
+- With the trend left in, G4 truth error moves only 20.44 to 19.57 mmag: the unmodelled trend dominates. In the trend-free run the primary core went 19.9 to 2.4, so the shape gain is real but hidden by the trend.
+- G6 39.9 mmag here is because O'Connell was off in this library (S1 needed); not a two-component issue.
+- Still to do: make `two` a proper candidate (config field instead of a policy hack), rerun at 120 and 1800 s, and replace the whole-curve rms gain criterion by an in-eclipse criterion and test it.

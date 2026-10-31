@@ -1,0 +1,43 @@
+file,candidate,status,k,bic,delta_bic,rms_truth,two_adopted,chosen
+detached_none_nooconnell_G1_B02_c600.vot,h2_b1_single,ok,13,-33366.35886905458,0.0,3.5764965573767262,False,True
+detached_none_nooconnell_G1_B02_c600.vot,h2_b1_two,ok,13,-33366.35886905458,0.0,3.5764965573767262,False,False
+detached_none_nooconnell_G1_B02_c600.vot,h23_b1_single,ok,14,-33359.29565756694,7.063211487642548,3.5689930747209013,False,False
+detached_none_nooconnell_G1_B02_c600.vot,h23_b1_two,ok,14,-33359.29565756694,7.063211487642548,3.5689930747209013,False,False
+detached_none_nooconnell_G1_B02_c600.vot,h123_b1_single,ok,15,-33351.25898506919,15.099883985392808,3.5668419666004803,False,False
+detached_none_nooconnell_G1_B02_c600.vot,h123_b1_two,ok,15,-33351.25898506919,15.099883985392808,3.5668419666004803,False,False
+detached_none_nooconnell_G2_B05_c600.vot,h2_b1_single,ok,15,-32970.651213566016,0.0,5.378654169445643,False,True
+detached_none_nooconnell_G2_B05_c600.vot,h2_b1_two,ok,15,-32970.651213566016,0.0,5.378654169445643,False,False
+detached_none_nooconnell_G2_B05_c600.vot,h23_b1_single,ok,16,-32970.44762072603,0.20359283998550382,5.3780973695219805,False,False
+detached_none_nooconnell_G2_B05_c600.vot,h23_b1_two,ok,16,-32970.44762072603,0.20359283998550382,5.3780973695219805,False,False
+detached_none_nooconnell_G2_B05_c600.vot,h123_b1_single,ok,17,-32967.2891659817,3.362047584312677,5.368590503862294,False,False
+detached_none_nooconnell_G2_B05_c600.vot,h123_b1_two,ok,17,-32967.2891659817,3.362047584312677,5.368590503862294,False,False
+semidetached_none_nooconnell_G4_B08_c600.vot,h2_b1_single,ok,11,-27555.20263632184,725.0002327140755,22.31138886173446,False,False
+semidetached_none_nooconnell_G4_B08_c600.vot,h2_b1_two,ok,11,-27555.20263632184,725.0002327140755,22.31138886173446,False,False
+semidetached_none_nooconnell_G4_B08_c600.vot,h23_b1_single,ok,12,-27899.920920854045,380.28194818186967,21.02815550578169,False,False
+semidetached_none_nooconnell_G4_B08_c600.vot,h23_b1_two,ok,12,-27899.920920854045,380.28194818186967,21.02815550578169,False,False
+semidetached_none_nooconnell_G4_B08_c600.vot,h123_b1_single,ok,15,-28040.16218632145,240.04068271446522,20.43873592261515,False,False
+semidetached_none_nooconnell_G4_B08_c600.vot,h123_b1_two,ok,18,-28280.202869035915,0.0,19.566038937811484,True,True
+contact_overcontact_nooconnell_G5_B11_c600.vot,h2_b1_single,ok,13,-32723.944631438564,16.901051187625853,6.261804399541701,False,False
+contact_overcontact_nooconnell_G5_B11_c600.vot,h2_b1_two,ok,13,-32723.944631438564,16.901051187625853,6.261804399541701,False,False
+contact_overcontact_nooconnell_G5_B11_c600.vot,h23_b1_single,ok,14,-32740.84568262619,0.0,6.162825388735914,False,True
+contact_overcontact_nooconnell_G5_B11_c600.vot,h23_b1_two,ok,14,-32740.84568262619,0.0,6.162825388735914,False,False
+contact_overcontact_nooconnell_G5_B11_c600.vot,h123_b1_single,FitDidNotConverge: fit_global: solver did not converge (status=0: The maximum number of function evaluations is exceeded.),,,,,,False
+contact_overcontact_nooconnell_G5_B11_c600.vot,h123_b1_two,FitDidNotConverge: fit_global: solver did not converge (status=0: The maximum number of function evaluations is exceeded.),,,,,,False
+contact_overcontact_oconnell_G6_B14_c600.vot,h2_b1_single,ok,13,-23701.553726955033,0.0,39.93087824644699,False,True
+contact_overcontact_oconnell_G6_B14_c600.vot,h2_b1_two,ok,13,-23701.553726955033,0.0,39.93087824644699,False,False
+contact_overcontact_oconnell_G6_B14_c600.vot,h23_b1_single,ok,14,-23693.74078752338,7.8129394316529215,39.928778758917346,False,False
+contact_overcontact_oconnell_G6_B14_c600.vot,h23_b1_two,ok,14,-23693.74078752338,7.8129394316529215,39.928778758917346,False,False
+contact_overcontact_oconnell_G6_B14_c600.vot,h123_b1_single,FitDidNotConverge: fit_global: solver did not converge (status=0: The maximum number of function evaluations is exceeded.),,,,,,False
+contact_overcontact_oconnell_G6_B14_c600.vot,h123_b1_two,FitDidNotConverge: fit_global: solver did not converge (status=0: The maximum number of function evaluations is exceeded.),,,,,,False
+detached_none_nooconnell_G8_B20_c600.vot,h2_b1_single,ok,13,-33466.13801929267,0.0,3.2043294346243756,False,True
+detached_none_nooconnell_G8_B20_c600.vot,h2_b1_two,ok,13,-33466.13801929267,0.0,3.2043294346243756,False,False
+detached_none_nooconnell_G8_B20_c600.vot,h23_b1_single,ok,14,-33458.85829055649,7.279728736182733,3.2103918326418484,False,False
+detached_none_nooconnell_G8_B20_c600.vot,h23_b1_two,ok,14,-33458.85829055649,7.279728736182733,3.2103918326418484,False,False
+detached_none_nooconnell_G8_B20_c600.vot,h123_b1_single,ok,15,-33452.28218682975,13.855832462926628,3.2026270489593394,False,False
+detached_none_nooconnell_G8_B20_c600.vot,h123_b1_two,ok,15,-33452.28218682975,13.855832462926628,3.2026270489593394,False,False
+detached_none_nooconnell_G1_B22_c600.vot,h2_b1_single,ok,13,-33366.358898518796,0.0,3.576498078752176,False,True
+detached_none_nooconnell_G1_B22_c600.vot,h2_b1_two,ok,13,-33366.358898518796,0.0,3.576498078752176,False,False
+detached_none_nooconnell_G1_B22_c600.vot,h23_b1_single,ok,14,-33359.295659689415,7.063238829381589,3.568993306375033,False,False
+detached_none_nooconnell_G1_B22_c600.vot,h23_b1_two,ok,14,-33359.295659689415,7.063238829381589,3.568993306375033,False,False
+detached_none_nooconnell_G1_B22_c600.vot,h123_b1_single,ok,15,-33351.258992820694,15.099905698101793,3.566848512655138,False,False
+detached_none_nooconnell_G1_B22_c600.vot,h123_b1_two,ok,15,-33351.258992820694,15.099905698101793,3.566848512655138,False,False
