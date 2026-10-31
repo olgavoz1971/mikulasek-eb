@@ -231,3 +231,16 @@ def test_the_real_generator_file_has_no_failures():
     pure = load_synthetic(REAL / data.meta["source_file"], with_errors=False)
     findings = check_synthetic(data, pure)
     assert not [f for f in findings if f.status == FAIL], findings
+
+
+def test_a_wrong_period_in_the_file_does_not_break_the_truth_checks():
+    """With period_eps the truth uses P_true while the table carries P_meta."""
+    data, pure = make()
+    eps = 1e-4
+    wrong = with_meta(
+        data, period=P * (1 + eps), P_meta_days=P * (1 + eps), period_eps=eps
+    )
+    findings = check_synthetic(wrong, pure)
+    assert not [f for f in findings if f.status in (FAIL, WARN)], findings
+    assert status(findings, "conjunction times") == PASS
+    assert status(findings, "smeared truth") == PASS

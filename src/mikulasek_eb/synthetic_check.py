@@ -359,6 +359,9 @@ def check_synthetic(data: SyntheticFile, pure: SyntheticFile | None = None) -> l
         _num(meta, "period_eps"),
     )
     period = _num(meta, "period")
+    # The truth (fluxes, conjunction times) is made with P_true; the table PERIOD is
+    # P_meta, which differs by period_eps on purpose.
+    truth_period = pt if pt is not None else (period or pm)
     if None not in (pt, pm, eps):
         ok = abs(abs(pm - pt) / pt - abs(eps)) <= 1e-9 + 1e-6 * abs(eps)
         add(
@@ -490,13 +493,13 @@ def check_synthetic(data: SyntheticFile, pure: SyntheticFile | None = None) -> l
             add("eclipse truth", FAIL, f"unknown kinds {sorted(set(kind))}")
         else:
             add("eclipse truth", PASS, f"{len(E)} eclipses, arrays consistent")
-            _check_eclipses(add, meta, t, cadence, period or pm, E, kind, tc, tm, oc)
+            _check_eclipses(add, meta, t, cadence, truth_period, E, kind, tc, tm, oc)
 
     # --- the smeared truth against an independent average of the pure curve
-    if pure is None or tp is None or (period or pm) is None or e is None:
+    if pure is None or tp is None or truth_period is None or e is None:
         add("smeared truth", SKIP, "pure curve not available")
     else:
-        curve = _pure_curve(pure, period or pm)
+        curve = _pure_curve(pure, truth_period)
         depth = float(tp.max() - tp.min())
         exposure_days = e / 86400.0
         scores = {
