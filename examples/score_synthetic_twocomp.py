@@ -1,8 +1,8 @@
 """Test: offer the second profile component as a candidate and let BIC decide.
 
-Each harmonic set (baseline order 1, no O'Connell) is fitted twice: ``single`` (the
-second component never tried) and ``two`` (the trial forced: threshold 0 and a 1 percent
-gain criterion; the other acceptance checks stay). ``select_model`` compares them by BIC.
+Each harmonic set (baseline order 1, O'Connell on and off) is fitted twice: ``single`` (the
+second component never tried) and ``two`` (``FitPolicy.force_two_component``: the trial always runs and
+the rms gain criterion is dropped; the other acceptance checks stay). ``select_model`` compares them by BIC.
 Reported per file: the BIC winner, whether a second component was really adopted, and the
 error against the noise-free observation, so the BIC choice can be judged by the truth.
 
@@ -47,11 +47,11 @@ def score_file(path) -> list[dict]:
     feats = extract_features(t, mag, payload["sig"], payload["period"], payload["epoch_jd"])
     cands = []
     for c in build_library(feats):
-        if c.config.data.baseline_order != 1 or c.config.model.ocon or c.config.model.harmonics not in HARMONICS:
+        if c.config.data.baseline_order != 1 or c.config.model.harmonics not in HARMONICS:
             continue
         pol = c.config.policy
         single = dataclasses.replace(pol, allow_two_component=False)
-        two = dataclasses.replace(pol, allow_two_component=True, rms_noise_two_comp_threshold=0.0, two_comp_min_rms_gain_frac=0.01)
+        two = dataclasses.replace(pol, allow_two_component=True, force_two_component=True)
         cands.append(Candidate(c.name + "_single", dataclasses.replace(c.config, policy=single).validate(), ()))
         cands.append(Candidate(c.name + "_two", dataclasses.replace(c.config, policy=two).validate(), ()))
     res = select_model(t, mag, payload["sig"], payload["period"], payload["epoch_jd"], features=feats, candidates=cands, data_id=path.stem)
@@ -70,7 +70,7 @@ def score_file(path) -> list[dict]:
 def main() -> None:
     """Run the test and write ``twocomp_vs_truth.md/csv``."""
     logging.basicConfig(level=logging.WARNING, format="%(message)s")
-    filters = sys.argv[1:] or ["c600"]
+    filters = sys.argv[1:] or ["_c"]
     with open(DEFAULT_RESULTS / "manifest.csv", newline="") as fh:
         manifest = [r for r in csv.DictReader(fh) if int(r["fail"]) == 0]
     rows, failures = [], []

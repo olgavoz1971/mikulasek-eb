@@ -89,6 +89,9 @@ class FitPolicy:
         separate_shape_chi2_frac (float): Unlock D2/G2 if chi2 drops by more than this fraction.
         clip_nsig (float): Out-of-eclipse MAD clip threshold (sigma).
         allow_two_component (bool): Try the second profile component after a poor fit.
+        force_two_component (bool): Try it whatever the fit quality and leave the decision
+            to the evidence (BIC) of the candidate comparison: the whole-curve rms gain
+            criterion is not applied, all other acceptance checks are.
         rms_noise_two_comp_threshold (float): Try the two-component fit above this rms/noise.
         eclipse_weight (float): Extra least-squares weight inside both eclipse windows
             (``sigma_eff = sigma / weight``); 1.0 means catalogue sigma only.
@@ -106,6 +109,7 @@ class FitPolicy:
     separate_shape_chi2_frac: float = 0.01
     clip_nsig: float = 5.0
     allow_two_component: bool = True
+    force_two_component: bool = False
     rms_noise_two_comp_threshold: float = 1.5
     eclipse_weight: float = 1.0
     eclipse_phase_half: float = 0.12
@@ -162,6 +166,7 @@ class FitConfig:
     separate_shape_chi2_frac: float = 0.01
     clip_nsig: float = 5.0
     allow_two_component: bool = True
+    force_two_component: bool = False
     rms_noise_two_comp_threshold: float = 1.5
     eclipse_weight: float = 1.0
     eclipse_phase_half: float = 0.12
@@ -277,6 +282,8 @@ class Config:
             raise ConfigError(f"eclipse_phase_half must be in (0, {MAX_WINDOW}].")
         if not 0 < p.two_comp_min_rms_gain_frac < 1:
             raise ConfigError("two_comp_min_rms_gain_frac must be in (0, 1).")
+        if p.force_two_component and not p.allow_two_component:
+            raise ConfigError("force_two_component requires allow_two_component.")
         if p.two_comp_min_agreeing_starts < 1:
             raise ConfigError("two_comp_min_agreeing_starts must be >= 1.")
         if not p.two_comp_eclipses or not set(p.two_comp_eclipses) <= {1, 2}:

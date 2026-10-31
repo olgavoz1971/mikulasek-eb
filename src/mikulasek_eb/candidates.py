@@ -7,6 +7,7 @@ and is our own heuristic, set on the test stars only.
 
 from __future__ import annotations
 
+import dataclasses
 import logging
 from dataclasses import dataclass
 
@@ -33,6 +34,9 @@ class RuleSettings:
         min_points_per_fwhm (float): Fewer points per FWHM is reported as unresolved.
         max_outlier_fraction (float): More outliers than this is reported.
         drift_sigma (float): Drift between halves above this many errors is reported.
+        two_component_candidates (bool): Also propose a twin of every candidate with the
+            second profile component forced (``_2c``), so the evidence decides. Off until
+            the synthetic calibration is finished.
     """
 
     harmonic_sigma: float = 3.0
@@ -46,6 +50,7 @@ class RuleSettings:
     min_points_per_fwhm: float = 8.0
     max_outlier_fraction: float = 0.02
     drift_sigma: float = 3.0
+    two_component_candidates: bool = False
 
 
 @dataclass(frozen=True)
@@ -200,4 +205,18 @@ def propose_candidates(features: Features, rules: RuleSettings | None = None) ->
                 FitPolicy(allow_two_component=True),
             ).validate()
             out.append(Candidate(name, cfg, tuple(reasons_common)))
+            if r.two_component_candidates:
+                twin = dataclasses.replace(
+                    cfg,
+                    policy=dataclasses.replace(
+                        cfg.policy, allow_two_component=True, force_two_component=True
+                    ),
+                ).validate()
+                out.append(
+                    Candidate(
+                        name + "_2c",
+                        twin,
+                        tuple(reasons_common) + ("second profile component forced",),
+                    )
+                )
     return out

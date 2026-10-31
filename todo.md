@@ -197,3 +197,10 @@ Scripts: `examples/score_synthetic_shape.py` (true trend removed, baseline order
 - With the trend left in, G4 truth error moves only 20.44 to 19.57 mmag: the unmodelled trend dominates. In the trend-free run the primary core went 19.9 to 2.4, so the shape gain is real but hidden by the trend.
 - G6 39.9 mmag here is because O'Connell was off in this library (S1 needed); not a two-component issue.
 - Still to do: make `two` a proper candidate (config field instead of a policy hack), rerun at 120 and 1800 s, and replace the whole-curve rms gain criterion by an in-eclipse criterion and test it.
+
+## Two components as a real candidate (2026-10-31)
+Added `FitPolicy.force_two_component` (trial always runs, rms-gain criterion dropped, other acceptance checks kept; needs `allow_two_component`), `RuleSettings.two_component_candidates` (off by default: adds `<name>_2c` twins), 2 tests; 133 tests pass. Table `results/synthetic_scoring/twocomp_vs_truth.md` (all cadences, O'Connell on/off, single against forced two, BIC decides).
+- BIC picks the two-component fit, and it is adopted, in 4 of 19 files: G4 at 120 and 600 s (dBIC -541, -240), G5 at 120 s (-437), G6 at 120 s (-341). Truth error gain is small with the trend in (0.2 to 0.9 mmag).
+- Never adopted wrongly in G1, G8, G2 (G2 1800 s: twin is 0.1 mmag better but dBIC +2.3, BIC keeps single).
+- G4 1800 s: not adopted (3 points per FWHM, no information).
+- Tooling lesson: waiting with `while pgrep -f <script>` hangs because pgrep matches its own command line; use a PID or a log marker.

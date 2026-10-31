@@ -112,3 +112,18 @@ def test_v477_lyr_with_a_shallow_secondary_now_fits():
     p, t = _load("v477_Lyr_sector_26")
     g = eb.initial_guess(t, p["mag"], p["period"])
     assert g["A2"] == pytest.approx(0.07, abs=0.03)
+
+
+def test_two_component_twins_are_offered_only_when_asked():
+    """``two_component_candidates`` adds a forced ``_2c`` twin of every candidate."""
+    from mikulasek_eb.candidates import RuleSettings
+
+    _, _, f = _features("EK_Com_sector_49")
+    plain = eb.propose_candidates(f)
+    assert not any(c.name.endswith("_2c") for c in plain)
+    both = eb.propose_candidates(f, RuleSettings(two_component_candidates=True))
+    assert len(both) == 2 * len(plain)
+    twins = [c for c in both if c.name.endswith("_2c")]
+    assert all(c.config.policy.force_two_component for c in twins)
+    assert not any(c.config.policy.force_two_component for c in plain)
+    assert len({c.name for c in both}) == len(both)

@@ -389,7 +389,9 @@ def run_staged_fit(
     logger.info("single-component rms/noise=%.2f G1=%.3f", ratio, r.p["G1"])
     r_single = r
 
-    if config.allow_two_component and ratio > config.rms_noise_two_comp_threshold:
+    if config.allow_two_component and (
+        config.force_two_component or ratio > config.rms_noise_two_comp_threshold
+    ):
         logger.info(
             "Two-component primary (extension, not Mikulasek 2015); rms/noise > %.1f",
             config.rms_noise_two_comp_threshold,
@@ -434,7 +436,7 @@ def run_staged_fit(
                 else False
             )
             check123 = (
-                rms_gain >= config.two_comp_min_rms_gain_frac
+                (config.force_two_component or rms_gain >= config.two_comp_min_rms_gain_frac)
                 and n_agree >= config.two_comp_min_agreeing_starts
                 and pos
                 and rel_ok

@@ -125,3 +125,16 @@ def test_defaults_match_the_values_used_before_the_refactor():
     )
     assert timing.local_windows == (0.15, 0.10, 0.06)
     json.loads(_config().to_json())  # valid JSON
+
+
+def test_force_two_component_needs_allow_two_component():
+    """Forcing the trial while forbidding it is a configuration error."""
+    cfg = _config()
+    bad = dataclasses.replace(
+        cfg,
+        policy=dataclasses.replace(
+            cfg.policy, allow_two_component=False, force_two_component=True
+        ),
+    )
+    with pytest.raises(ConfigError):
+        bad.validate()
