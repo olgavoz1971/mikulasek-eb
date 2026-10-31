@@ -174,3 +174,10 @@ Scripts: `examples/score_synthetic_shape.py` (true trend removed, baseline order
 - G6 (spot and O'Connell): bias +82 s (primary) and -98 s (secondary) against T_min_pure; T_conj - T_min_pure is +170 and -189 s. The O'Connell candidate was not in this timing library, so rerun with it on.
 - G8 secondary bias -28 s (120 s file) to +98 s (1800 s file), not significant against the scatter 45 to 160 s.
 - Not done: circular against eccentric comparison; G7 (period commensurate); rerun G1 and G8 with the empty harmonic set.
+
+## Profile experiment (2026-10-31)
+`examples/score_synthetic_profiles.py`: profiles 1 to 4, harmonics 23 and 123, O'Connell on/off, true trend removed, baseline 0, 600 s files. Profiles 5 to 7 are not in the staged pipeline (need `fit_global`), not tried. Shape error, best of each profile (mmag):
+- G2 (total eclipse): p1 1.92, p2 2.16, p3 3.99, p4 2.44.
+- G4 (Algol): p1 6.84, p2 6.84, p3 5.27, p4 7.11 (two-component).
+- G6 (spot, O'Connell): p1 3.86, p2 3.86, p3 3.30, p4 5.12.
+- Profile 2 equals profile 1 where C is not needed; profile 3 helps G4 and G6 but hurts G2; no profile reaches 1 to 2 mmag on G4/G6. One file each, so only a pointer for the tiered search.
