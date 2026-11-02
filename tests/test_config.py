@@ -138,3 +138,18 @@ def test_force_two_component_needs_allow_two_component():
     )
     with pytest.raises(ConfigError):
         bad.validate()
+
+
+def test_timing_window_above_quarter_needs_overlap_flag():
+    """A window up to 0.5 is valid only with ``allow_overlapping_windows``."""
+    from mikulasek_eb.config import TimingRecipe
+
+    base = Config(ModelSpec(profile=1, harmonics=(2,), ocon=False), DataSetup(0, None))
+    wide = TimingRecipe(window=0.5)
+    with pytest.raises(ConfigError):
+        dataclasses.replace(base, timing=wide).validate()
+    dataclasses.replace(
+        base, timing=dataclasses.replace(wide, allow_overlapping_windows=True)
+    ).validate()
+    with pytest.raises(ConfigError):
+        dataclasses.replace(base, timing=TimingRecipe(min_points=4, min_each_side=3)).validate()

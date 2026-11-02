@@ -122,6 +122,7 @@ from .tom import (
 )
 from .io import load_tess_votable
 from .helpers import absolute_jd_to_mjd
+from .curve_minimum import BISECTOR_FRACTIONS, CurveMinimum, measure_curve_minimum
 
 __all__ = [
     "Candidate",
@@ -208,4 +209,7 @@ __all__ = [
     "mjd_to_jd",
     "load_tess_votable",
     "absolute_jd_to_mjd",
+    "BISECTOR_FRACTIONS",
+    "CurveMinimum",
+    "measure_curve_minimum",
 ]

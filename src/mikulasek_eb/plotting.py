@@ -264,3 +264,57 @@ def plot_global_fit(
         plt.show()
     else:
         plt.close(fig)
+
+
+def plot_instrumental_trend(
+    t,
+    mag,
+    yhat,
+    template,
+    save_path,
+    title: str,
+    *,
+    injected_mag=None,
+) -> None:
+    """Save the fitted instrumental trend next to the light curve and the template.
+
+    The trend is the per-segment baseline of the fit: the full prediction minus the
+    eclipse template. When ``injected_mag`` is given it is drawn on the same panel,
+    shifted to the median of the fitted trend, so the shapes can be compared; a
+    constant between them is the magnitude zero point.
+
+    Args:
+        t (ndarray): Times (days).
+        mag (ndarray): Observed magnitudes.
+        yhat (ndarray): Full prediction, template plus baseline.
+        template (ndarray): Eclipse template at the same times, without the baseline.
+        save_path (str | Path): File to write.
+        title (str): Figure title.
+        injected_mag (ndarray | None): Instrumental trend known independently, in magnitudes.
+    """
+    t = np.asarray(t, float)
+    mag = np.asarray(mag, float)
+    trend = np.asarray(yhat, float) - np.asarray(template, float)
+    fig, axes = plt.subplots(3, 1, figsize=(12, 9), sharex=True)
+    axes[0].plot(t, mag, ".", ms=2, color="0.6", label="data")
+    axes[0].plot(t, yhat, "r-", lw=0.8, label="template + trend")
+    axes[0].invert_yaxis()
+    axes[0].set_ylabel("magnitude")
+    axes[0].legend(loc="upper right")
+    axes[0].set_title(title)
+    axes[1].plot(t, trend, "b-", lw=0.8, label="fitted trend")
+    if injected_mag is not None:
+        injected = np.asarray(injected_mag, float)
+        injected = injected - np.median(injected) + np.median(trend)
+        axes[1].plot(t, injected, "k-", lw=0.8, alpha=0.7, label="injected trend, median aligned")
+    axes[1].set_ylabel("trend (mag)")
+    axes[1].legend(loc="upper right")
+    axes[2].plot(t, mag - trend, ".", ms=2, color="0.6", label="data minus trend")
+    axes[2].plot(t, template, "r-", lw=0.8, label="template")
+    axes[2].invert_yaxis()
+    axes[2].set_ylabel("magnitude")
+    axes[2].set_xlabel("time (days)")
+    axes[2].legend(loc="upper right")
+    fig.tight_layout()
+    fig.savefig(save_path, dpi=100)
+    plt.close(fig)

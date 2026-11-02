@@ -123,3 +123,31 @@ def test_virtual_minima_sigma_calibrated(window):
     )
     z = vm["delta"] / vm["sigma"]
     assert 0.5 < float(np.std(z)) < 1.6
+
+
+def test_virtual_minima_min_points_is_a_parameter():
+    """Sparse sampling is rejected by the default threshold and accepted with a lower one."""
+    t, mag, sig, model = _make_lightcurve()
+    keep = np.arange(len(t)) % 12 == 0  # 72 min cadence, 5 points in a +-0.25 window
+    t, mag, sig = t[keep], mag[keep], sig[keep]
+    ephem = dict(M0=M0_D, P0=PERIOD_D)
+    rejected: list = []
+    none = virtual_minima(t, mag, sig, model, TRUE_PARAMS, ephem, rejected=rejected)
+    assert len(none["T"]) == 0
+    assert {r["reason"] for r in rejected} == {"too_few_points"}
+    some = virtual_minima(
+        t, mag, sig, model, TRUE_PARAMS, ephem, min_points=4, min_each_side=2
+    )
+    assert len(some["T"]) > 30  # about 80 events
+
+
+def test_virtual_minima_overlapping_window_is_opt_in():
+    """A window above 0.25 is capped unless overlap is allowed; then events share points."""
+    t, mag, sig, model = _make_lightcurve()
+    ephem = dict(M0=M0_D, P0=PERIOD_D)
+    capped = virtual_minima(t, mag, sig, model, TRUE_PARAMS, ephem, window=0.5)
+    wide = virtual_minima(
+        t, mag, sig, model, TRUE_PARAMS, ephem, window=0.5, allow_overlap=True
+    )
+    assert np.max(capped["n"]) < np.min(wide["n"]) * 0.75
+    assert np.median(wide["sigma"]) < np.median(capped["sigma"])

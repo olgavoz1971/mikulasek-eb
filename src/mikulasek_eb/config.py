@@ -29,12 +29,17 @@ SCHEMA_VERSION = 1
 
 # Fraction-of-phase limit for any timing window: whole phase around one event.
 MAX_WINDOW = 0.25
+# Hard limit of a timing window that overlaps the neighbouring event (whole cycle); allowed only
+# with ``TimingRecipe.allow_overlapping_windows``.
+MAX_OVERLAP_WINDOW = 0.5
 
 # Defaults of the timing recipe (also exported by ``mikulasek_eb.tom`` under these names).
 HALF_ORBIT_WINDOW = 0.25
 LOCAL_WINDOWS = (0.15, 0.10, 0.06)
 TIMING_BASELINE_ORDER = 1
 MAX_SIGMA_FACTOR = 5.0
+MIN_POINTS_PER_EVENT = 10
+MIN_POINTS_EACH_SIDE = 3
 
 # Fields that are tuples in Python and lists in JSON.
 _TUPLE_FIELDS = {"harmonics", "gamma_starts", "two_comp_eclipses", "local_windows"}
@@ -127,12 +132,18 @@ class TimingRecipe:
     """How times of minima are measured (kept separately for homogeneity).
 
     Attributes:
-        window (float): Phase half-width of the fit around each eclipse (cycles, at most 0.25).
+        window (float): Phase half-width of the fit around each eclipse (cycles, at most 0.25;
+            up to 0.5 with ``allow_overlapping_windows``).
         baseline_order (int): Per-event polynomial degree.
         max_sigma_factor (float): Drop events whose sigma exceeds this times the median.
         require_contact_walls (bool): Require points on both walls (90 to 10 percent band).
         clip_outliers (bool): Apply the sigma cut and the 4-sigma O-C clip.
         local_windows (tuple[float, ...]): Windows tried for local primary/secondary-only files.
+        min_points (int): Minimum points in the window of one event (low-cadence data need less).
+        min_each_side (int): Minimum points on each side of the predicted centre.
+        allow_overlapping_windows (bool): Allow ``window`` above 0.25 (up to 0.5, the whole
+            cycle). Windows then overlap the neighbouring event: points are used by two events
+            and the timings of neighbours are correlated; only ``virtual_minima`` supports it.
         template (str): Which template the timings use. Only ``"own"`` (the solution of the
             same light curve) is implemented.
     """
@@ -143,6 +154,9 @@ class TimingRecipe:
     require_contact_walls: bool = True
     clip_outliers: bool = True
     local_windows: tuple = LOCAL_WINDOWS
+    min_points: int = MIN_POINTS_PER_EVENT
+    min_each_side: int = MIN_POINTS_EACH_SIDE
+    allow_overlapping_windows: bool = False
     template: str = "own"
 
 
@@ -288,10 +302,19 @@ class Config:
             raise ConfigError("two_comp_min_agreeing_starts must be >= 1.")
         if not p.two_comp_eclipses or not set(p.two_comp_eclipses) <= {1, 2}:
             raise ConfigError("two_comp_eclipses must be a non-empty subset of {1, 2}.")
-        if not 0 < t.window <= MAX_WINDOW:
-            raise ConfigError(f"timing window must be in (0, {MAX_WINDOW}].")
+        wmax = MAX_OVERLAP_WINDOW if t.allow_overlapping_windows else MAX_WINDOW
+        if not 0 < t.window <= wmax:
+            raise ConfigError(
+                f"timing window must be in (0, {wmax}]; above {MAX_WINDOW} set "
+                "allow_overlapping_windows."
+            )
         if any(not 0 < w <= MAX_WINDOW for w in t.local_windows):
             raise ConfigError(f"timing local_windows must be in (0, {MAX_WINDOW}].")
+        if t.min_points < 3 or t.min_each_side < 1 or 2 * t.min_each_side > t.min_points:
+            raise ConfigError(
+                "timing min_points must be >= 3, min_each_side >= 1 and "
+                "2 * min_each_side <= min_points."
+            )
         if t.baseline_order < 0 or not t.max_sigma_factor > 0:
             raise ConfigError(
                 "timing baseline_order must be >= 0 and max_sigma_factor > 0."

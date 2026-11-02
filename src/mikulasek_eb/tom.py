@@ -15,6 +15,8 @@ from astropy.time import Time
 
 from .config import (  # noqa: F401
     HALF_ORBIT_WINDOW,
+    MIN_POINTS_EACH_SIDE,
+    MIN_POINTS_PER_EVENT,
     LOCAL_WINDOWS,
     MAX_SIGMA_FACTOR,
     TIMING_BASELINE_ORDER,
@@ -189,6 +191,9 @@ def time_both_walls(
     rejected: list | None = None,
     baseline_order: int = TIMING_BASELINE_ORDER,
     max_sigma_factor: float = MAX_SIGMA_FACTOR,
+    min_points: int = MIN_POINTS_PER_EVENT,
+    min_each_side: int = MIN_POINTS_EACH_SIDE,
+    allow_overlap: bool = False,
 ) -> dict:
     """Time eclipses; convert T to JD and number E from T0.
 
@@ -203,7 +208,8 @@ def time_both_walls(
         sig (ndarray): Catalogue magnitude uncertainties.
         model: Frozen ``EBModel``.
         r: Global fit (template and ephemeris in MJD).
-        window (float): Phase half-width (capped at 0.25 by ``virtual_minima``).
+        window (float): Phase half-width (capped at 0.25 by ``virtual_minima`` unless
+            ``allow_overlap``).
         which (str): ``all``, ``primary``, or ``secondary`` on the T0 fold.
         t0_jd (float): VOTable epoch as absolute JD.
         period (float): Period used to number E (VOTable PARAM, days).
@@ -215,6 +221,9 @@ def time_both_walls(
             (see ``virtual_minima``).
         baseline_order (int): Per-event polynomial degree.
         max_sigma_factor (float): Sigma cut in units of the median sigma (used when clipping).
+        min_points (int): Minimum points in the window of one event.
+        min_each_side (int): Minimum points on each side of the predicted centre.
+        allow_overlap (bool): Allow windows above 0.25 (overlapping events).
 
     Returns:
         dict: Timings with ``T`` as absolute JD and E from T0.
@@ -231,8 +240,11 @@ def time_both_walls(
         window=window,
         order=baseline_order,
         free=(),
+        min_points=min_points,
+        min_each_side=min_each_side,
         wall_band=wb,
         rejected=engine_rejected,
+        allow_overlap=allow_overlap,
     )
     if rejected is not None:
         rejected.extend(
@@ -295,6 +307,9 @@ def time_with_recipe(
         rejected=rejected,
         baseline_order=recipe.baseline_order,
         max_sigma_factor=recipe.max_sigma_factor,
+        min_points=recipe.min_points,
+        min_each_side=recipe.min_each_side,
+        allow_overlap=recipe.allow_overlapping_windows,
     )
 
 

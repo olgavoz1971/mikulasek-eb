@@ -66,7 +66,7 @@ def fit_minimum(
         p (dict): Template parameters held fixed (except the scales).
         ephem (dict): Ephemeris (M0, P0 in days; optional Pdot).
         E (float): Eclipse number.
-        window (float): Half-width of the fitted phase window (cycles, at most 0.25).
+        window (float): Half-width of the fitted phase window (cycles, at most 0.25, or 0.5 when overlapping windows are used).
         order (int): Per-event baseline polynomial degree.
         free (tuple of str): Shape scales to fit, subset of "A", "D", "G".
         scan (float): First scan the shift over +-scan cycles to avoid local minima (0 = off).
@@ -158,9 +158,14 @@ def virtual_minima(
     wall_band=None,
     min_wall=3,
     rejected=None,
+    allow_overlap=False,
     **kw,
 ):
-    """Fit every eclipse covered by the data (window <= 0.25 so events never overlap).
+    """Fit every eclipse covered by the data.
+
+    The window is at most 0.25 so that events never overlap, unless ``allow_overlap`` is set
+    (then at most 0.5, the whole cycle): points are then used by two events and the timings of
+    neighbouring events are correlated.
 
     Events lacking enough points, or points on both sides of the predicted centre, are
     skipped and recorded, never dropped silently. If ``wall_band`` is given an event also
@@ -186,19 +191,27 @@ def virtual_minima(
         rejected (list or None): Receives one dict per skipped event:
             ``{"E": float, "reason": "too_few_points" | "one_side_uncovered" |
             "walls_uncovered" | "fit_failed", "detail": str}``.
+        allow_overlap (bool): Allow windows above 0.25 (up to 0.5), overlapping the
+            neighbouring events.
         **kw: Passed to ``fit_minimum`` (``scan``, ``rescale``).
 
     Returns:
         dict: Arrays E, T (days), sigma (days), delta (days), n, rchi2.
     """
-    window = min(window, 0.25)
+    if window > 0.25 and not allow_overlap:
+        window = 0.25
+    window = min(window, 0.5)
+    if window > 0.25:
+        logger.warning(
+            "window %.2f > 0.25: events overlap, neighbouring timings are correlated", window
+        )
     t = np.asarray(t, float)
     th = phase(t, ephem["M0"], ephem["P0"], ephem.get("Pdot", 0.0))
     En = np.round(2 * th) / 2
-    near = np.abs(th - En) < window
+    near = np.abs(th - En) < min(window, 0.25)
     rows = []
     for E in np.unique(En[near]):
-        d = th[near & (En == E)] - E
+        d = th[np.abs(th - E) < window] - E
         reason = None
         if len(d) < min_points:
             reason = "too_few_points"
