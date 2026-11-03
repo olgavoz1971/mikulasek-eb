@@ -95,9 +95,10 @@ def report_fit(tag: str, r: FitResult, noise: float) -> None:
     """
     log = logging.getLogger(__name__)
     log.info(
-        "[%s] success=%s chi2=%.1f rchi2=%.2f rms=%.5f mag rms/noise=%.2f",
+        "[%s] success=%s nfev=%d chi2=%.1f rchi2=%.2f rms=%.5f mag rms/noise=%.2f",
         tag,
         r.success,
+        r.nfev,
         r.chi2,
         r.rchi2,
         r.rms,

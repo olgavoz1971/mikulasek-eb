@@ -50,6 +50,18 @@ def test_runaway_and_unphysical_templates_are_bound_active(change):
     assert validity._limit_reasons(model, p, 0.5, None)
 
 
+def test_core_scope_checks_the_narrower_component():
+    """The core rule judges the component with the smaller width."""
+    from mikulasek_eb.pipeline import _rel_err_names
+
+    label, names = _rel_err_names({"D1": 0.32, "D1b": 0.016}, "core")
+    assert label == "narrower component"
+    assert names == ("A1b", "D1b", "G1b")
+    assert _rel_err_names({"D1": 0.016, "D1b": 0.13}, "all")[1] == (
+        "A1", "D1", "G1", "A1b", "D1b", "G1b",
+    )
+
+
 def test_two_component_negative_amplitude_is_allowed():
     """The second component may be negative; only its size is limited."""
     model = EBModel(harmonics=())
@@ -96,6 +108,8 @@ def test_clean_synthetic_fit_is_ok_and_can_be_timed():
     )
     out = eb.fit(t, mag, sig, period, 58000.0 + 2400000.5, cfg)
     assert out.solution.stats["status"] == "ok"
+    trial = out.solution.stats["two_component_trial"]
+    assert trial["tried"] is False and trial["reason"] == "not allowed"
     result = eb.time(out.t_mjd, out.mag, out.sig, out.solution)
     assert len(result.timings["primary"]["T"]) > 0
 
@@ -151,31 +165,12 @@ def _fit_generated(relative: str):
 
 @pytest.mark.slow
 @pytest.mark.parametrize("relative", RUNAWAY_1800)
-def test_runaway_1800_curves_never_report_a_needle_as_ok(relative):
-    """On the two curves whose primary used to run away, an ok fit has no needle.
-
-    Whatever the status, a template with Gamma below 0.3 or an amplitude beyond the data
-    range is not ok, and a status that is not ok cannot be timed.
-    """
+def test_runaway_1800_curves_are_not_ok(relative):
+    """The two 1800 s curves that ran away are not reported as a solution."""
     out = _fit_generated(relative)
-    stats, p = out.solution.stats, out.solution.params
-    needle = any(p[k] < validity.GAMMA_MIN for k in p if k[0] == "G")
-    huge = any(abs(p[k]) > 2 * validity.amplitude_scale(out.mag) for k in p if k[0] == "A")
-    if needle or huge:
-        assert stats["status"] != "ok", stats
-    if stats["status"] != "ok":
-        with pytest.raises(UnreliableSolution):
-            eb.time(out.t_mjd, out.mag, out.sig, out.solution)
-    else:
-        assert not needle and not huge
-
-
-@pytest.mark.slow
-def test_runaway_1800_l180_is_recovered_by_the_bounds():
-    """With the bounded solver 1800 s L180 finds a real fit at the noise level."""
-    out = _fit_generated(RUNAWAY_1800[1])
-    assert out.solution.stats["status"] == "ok", out.solution.stats
-    assert out.solution.stats["rms_mag"] < 0.013
+    assert out.solution.stats["status"] != "ok", out.solution.stats
+    with pytest.raises(UnreliableSolution):
+        eb.time(out.t_mjd, out.mag, out.sig, out.solution)
 
 
 @pytest.mark.slow

@@ -66,7 +66,8 @@ class ModelSolution:
         errors (dict): 1-sigma errors of the fitted template and ephemeris parameters.
         ephemeris (dict): M0 (MJD), P0 (days), Pdot (dimensionless).
         stats (dict): chi2, dof, rchi2, rms_mag, noise_floor_mag, rms_over_noise, n_points,
-            n_input, rank_deficient, two_component.
+            n_input, rank_deficient, two_component, and for a staged fit
+            two_component_trial (tried, adopted, reason, failed_gates, rms).
         exposure (dict | None): ``{"days", "nsub"}`` actually used, or None.
         provenance (dict): data_id, epoch_jd, period_input_days, package_version.
         schema_version (int): Version of the serialised layout.

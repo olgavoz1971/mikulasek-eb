@@ -20,9 +20,9 @@ multi-start, residuals, window scan, clipping), `pipeline` (staged fit), `tom` (
 
 Hard limits of the code. Say so to the user when relevant, never work around them silently:
 - circular orbits only (secondary must sit at phase 0.5); eccentric systems are out of scope;
-- no exposure-time supersampling (long cadence + narrow eclipses biases D wide; timings stay roughly unbiased);
+- exposure integration is optional (`exposure_days` on the data layer). Without it a long cadence biases D wide; see section 10 of the implementation notes;
 - no eclipse-asymmetry parameter (an asymmetric minimum biases timings);
-- `least_squares(method="lm")` is unbounded: always check D>0 and Γ>0 after a fit;
+- the default solver is Levenberg-Marquardt. Every fit then carries a status (`ok`, `bound-active`, `unresolved`); `time` refuses anything but `ok`. See `docs/mikulasek_implementation_notes.md`, section 11. `FitPolicy.bounded_solver` is an optional second attempt, not the default;
 - the optional second eclipse component (section 4b) is my extension, not part of the paper's method; label it as such in every report.
 
 ## 1. Conventions (get these right first)

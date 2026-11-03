@@ -106,8 +106,13 @@ class FitPolicy:
         two_comp_min_rms_gain_frac (float): Acceptance: fractional rms improvement.
         two_comp_min_agreeing_starts (int): Acceptance: starts agreeing with the best chi2.
         two_comp_max_rel_err (float): Acceptance: largest relative parameter error.
+        two_comp_rel_err_scope (str): ``all`` applies that limit to both components.
+            ``core`` applies it only to the narrower one. The default is ``all``.
         two_comp_eclipses (tuple[int, ...]): Eclipses (1, 2) that get the second component.
         two_comp_timing_agreement_sigma_max (float): Acceptance: median |dT|/combined sigma.
+        bounded_solver (bool): Use the trust-region solver with box bounds on the
+            eclipse shape. The default is False: Levenberg-Marquardt, with the
+            same limits applied afterwards by the verdict.
     """
 
     gamma_starts: tuple = (0.5, 1, 2, 4, 8)
@@ -123,8 +128,10 @@ class FitPolicy:
     two_comp_min_rms_gain_frac: float = 0.25
     two_comp_min_agreeing_starts: int = 2
     two_comp_max_rel_err: float = 0.5
+    two_comp_rel_err_scope: str = "all"
     two_comp_eclipses: tuple = (1,)
     two_comp_timing_agreement_sigma_max: float = 1.0
+    bounded_solver: bool = False
 
 
 @dataclass(frozen=True)
@@ -189,8 +196,10 @@ class FitConfig:
     two_comp_min_rms_gain_frac: float = 0.25
     two_comp_min_agreeing_starts: int = 2
     two_comp_max_rel_err: float = 0.5
+    two_comp_rel_err_scope: str = "all"
     two_comp_eclipses: tuple = (1,)
     two_comp_timing_agreement_sigma_max: float = 1.0
+    bounded_solver: bool = False
 
 
 def _layer_from_dict(cls, data: dict, layer: str):
@@ -298,6 +307,10 @@ class Config:
             raise ConfigError("two_comp_min_rms_gain_frac must be in (0, 1).")
         if p.force_two_component and not p.allow_two_component:
             raise ConfigError("force_two_component requires allow_two_component.")
+        if not isinstance(p.bounded_solver, bool):
+            raise ConfigError("bounded_solver must be true or false.")
+        if p.two_comp_rel_err_scope not in ("all", "core"):
+            raise ConfigError("two_comp_rel_err_scope must be 'all' or 'core'.")
         if p.two_comp_min_agreeing_starts < 1:
             raise ConfigError("two_comp_min_agreeing_starts must be >= 1.")
         if not p.two_comp_eclipses or not set(p.two_comp_eclipses) <= {1, 2}:

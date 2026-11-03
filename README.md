@@ -11,7 +11,7 @@ Phenomenological light-curve model and eclipse timing for eclipsing binaries, im
 - Global fit of the phase curve (Eqs. 13, 15, 17) with per-segment baselines and propagated uncertainties.
 - Times of individual minima ("virtual minima", Eq. 9) with an explicit record of every eclipse that could not be timed.
 - A staged fitting pipeline for TESS light curves, plus optional extensions that are not in the paper (second profile component, eclipse weighting), off by default.
-- Fail-fast behaviour: non-converged or degenerate fits raise or are flagged, nothing is silently replaced.
+- Fail-fast behaviour: non-converged or degenerate fits raise or are flagged, nothing is silently replaced. A finished fit also carries a status (`ok`, `bound-active`, `unresolved`); only `ok` may be timed. The solver, the limits and the cases that motivated them are in `docs/mikulasek_implementation_notes.md`, section 11.
 
 Circular orbits and single-band magnitudes only.
 

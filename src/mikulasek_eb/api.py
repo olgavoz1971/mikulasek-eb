@@ -159,6 +159,7 @@ def solution_from_pipeline(
         n_input=n_input,
         rank_deficient=adopted.rank_deficient,
         two_component="A1b" in adopted.p,
+        two_component_trial=result.two_component_trial,
     )
     if result.verdict is None:
         raise ValueError("The pipeline result has no fit verdict.")

@@ -53,6 +53,8 @@ class FitPipelineResult:
         config (Config): The full layered configuration used (provenance).
         verdict (FitVerdict | None): Status of the adopted template (``ok``,
             ``bound-active`` or ``unresolved``). Always set by ``run_staged_fit``.
+        two_component_trial (dict | None): What happened to the second component.
+            Always set by ``run_staged_fit``. Recording it does not change the decision.
     """
 
     model: EBModel
@@ -67,6 +69,76 @@ class FitPipelineResult:
     initial_guess: dict
     config: Config
     verdict: FitVerdict | None = None
+    two_component_trial: dict | None = None
+
+
+def _rel_err_names(parameters: dict, scope: str) -> tuple[str, tuple[str, ...]]:
+    """Names the relative-error gate looks at.
+
+    Args:
+        parameters (dict): Two-component template.
+        scope (str): ``all`` or ``core``.
+
+    Returns:
+        tuple[str, tuple[str, ...]]: A short label and the parameter names.
+
+    Raises:
+        ConfigError: If ``scope`` is unknown.
+    """
+    both = ("A1", "D1", "G1", "A1b", "D1b", "G1b")
+    if scope == "all":
+        return "both components", both
+    if scope == "core":
+        narrow = ("A1", "D1", "G1") if parameters["D1"] <= parameters["D1b"] else ("A1b", "D1b", "G1b")
+        return "narrower component", narrow
+    raise ConfigError(f"two_comp_rel_err_scope must be 'all' or 'core', got {scope!r}.")
+
+
+def _two_component_record(
+    *,
+    tried: bool,
+    adopted: bool,
+    reason: str,
+    failed_gates: list[str],
+    single_rms_mmag: float,
+    rms_mmag: float | None = None,
+    rms_gain: float | None = None,
+    timing_ok: bool | None = None,
+    rel_err_scope: str = "all",
+    rel_err_on: str = "",
+) -> dict:
+    """Record the second-component trial. The record decides nothing.
+
+    Args:
+        tried (bool): Whether a two-component fit was run.
+        adopted (bool): Whether its template replaced the single-component one.
+        reason (str): ``not allowed``, ``below rms/noise``, ``no valid start``,
+            ``adopted`` or ``rejected``.
+        failed_gates (list[str]): Gates that failed. Empty when the trial was
+            adopted or was not run.
+        single_rms_mmag (float): Rms of the single-component template (mmag).
+        rms_mmag (float | None): Rms of the two-component template (mmag).
+        rms_gain (float | None): Fractional rms improvement of the trial.
+        timing_ok (bool | None): Whether the eclipse times of the two templates
+            agreed. A disagreement is recorded and does not by itself reject.
+        rel_err_scope (str): ``all`` or ``core``.
+        rel_err_on (str): Which parameters the relative-error gate used.
+
+    Returns:
+        dict: JSON-serialisable record.
+    """
+    return dict(
+        tried=tried,
+        adopted=adopted,
+        reason=reason,
+        failed_gates=list(failed_gates),
+        single_rms_mmag=float(single_rms_mmag),
+        rms_mmag=None if rms_mmag is None else float(rms_mmag),
+        rms_gain=None if rms_gain is None else float(rms_gain),
+        timing_ok=timing_ok,
+        rel_err_scope=rel_err_scope,
+        rel_err_on=rel_err_on,
+    )
 
 
 def _shape_free_names(r, model: EBModel) -> list[str]:
@@ -233,7 +305,11 @@ def run_staged_fit(
         )
     hnames = _harmonic_free_names(model)
     amp_scale = amplitude_scale(mag)
-    bounds = shape_bounds(amp_scale)
+    bounds = shape_bounds(amp_scale) if config.bounded_solver else None
+    logger.info(
+        "solver %s",
+        "bounded trust-region" if bounds else "Levenberg-Marquardt",
+    )
     p0 = complete_template(
         dict(A1=g["A1"], A2=g["A2"], D1=D_from_fwhm(g["fwhm"], 1.0), G1=1.0),
         model,
@@ -400,6 +476,7 @@ def run_staged_fit(
     ratio = r.rms / nf
     logger.info("single-component rms/noise=%.2f G1=%.3f", ratio, r.p["G1"])
     r_single = r
+    single_rms_mmag = 1e3 * float(r_single.rms)
 
     if config.allow_two_component and (
         config.force_two_component or ratio > config.rms_noise_two_comp_threshold
@@ -430,6 +507,10 @@ def run_staged_fit(
             )
         if r_two is None:
             logger.info("No valid two-component start; keeping single-component.")
+            trial = _two_component_record(
+                tried=True, adopted=False, reason="no valid start", failed_gates=[],
+                single_rms_mmag=single_rms_mmag,
+            )
         else:
             report_fit("6 two-component primary", r_two, nf)
             ok_chi = [
@@ -439,15 +520,33 @@ def run_staged_fit(
                 np.sum(np.abs(np.asarray(ok_chi) - r_two.chi2) / r_two.chi2 < 0.01)
             )
             rms_gain = 1.0 - r_two.rms / r_single.rms
-            keys = ("A1", "D1", "G1", "A1b", "D1b", "G1b")
-            rel = {k: r_two.err[k] / abs(r_two.p[k]) for k in keys if k in r_two.err}
+            rel_label, rel_names = _rel_err_names(r_two.p, config.two_comp_rel_err_scope)
+            rel = {k: r_two.err[k] / abs(r_two.p[k]) for k in rel_names if k in r_two.err}
             deg = two_component_degenerate(r_two.p, 1, r_single.p["A1"])
             pos = all(r_two.p[k] > 0 for k in ("D1", "G1", "D1b", "G1b"))
-            rel_ok = (
-                all(v < config.two_comp_max_rel_err for v in rel.values())
-                if rel
-                else False
+            rel_ok = len(rel) == len(rel_names) and all(
+                v < config.two_comp_max_rel_err for v in rel.values()
             )
+            failed_gates = []
+            if not (config.force_two_component or rms_gain >= config.two_comp_min_rms_gain_frac):
+                failed_gates.append(
+                    f"rms gain {rms_gain:.3f} below {config.two_comp_min_rms_gain_frac}"
+                )
+            if n_agree < config.two_comp_min_agreeing_starts:
+                failed_gates.append(
+                    f"agreeing starts {n_agree} below {config.two_comp_min_agreeing_starts}"
+                )
+            if not pos:
+                failed_gates.append("a width or Gamma is not positive")
+            if not rel_ok:
+                over = [
+                    f"{k}={v:.2f}" for k, v in rel.items() if v >= config.two_comp_max_rel_err
+                ]
+                failed_gates.append(
+                    f"relative error above {config.two_comp_max_rel_err}: {', '.join(over)}"
+                )
+            if deg:
+                failed_gates.append("degenerate amplitudes")
             check123 = (
                 (config.force_two_component or rms_gain >= config.two_comp_min_rms_gain_frac)
                 and n_agree >= config.two_comp_min_agreeing_starts
@@ -489,15 +588,36 @@ def run_staged_fit(
                         "see check4 line above."
                     )
             else:
-                logger.info("Two-component rejected; keeping single-component.")
+                logger.info(
+                    "Two-component rejected; keeping single-component. Failed: %s",
+                    "; ".join(failed_gates),
+                )
+            trial = _two_component_record(
+                tried=True, adopted=bool(check123),
+                reason="adopted" if check123 else "rejected",
+                failed_gates=[] if check123 else failed_gates,
+                single_rms_mmag=single_rms_mmag, rms_mmag=1e3 * float(r_two.rms),
+                rms_gain=float(rms_gain), timing_ok=bool(timing_ok),
+                rel_err_scope=config.two_comp_rel_err_scope,
+                rel_err_on=f"{rel_label}: {', '.join(rel_names)}",
+            )
     elif not config.allow_two_component:
         logger.info("Skipping two-component: not allowed in this star's FitConfig.")
+        trial = _two_component_record(
+            tried=False, adopted=False, reason="not allowed", failed_gates=[],
+            single_rms_mmag=single_rms_mmag,
+        )
     else:
         logger.info(
             "Skipping two-component: rms/noise %.2f <= %.1f.",
             ratio,
             config.rms_noise_two_comp_threshold,
         )
+        trial = _two_component_record(
+            tried=False, adopted=False, reason="below rms/noise", failed_gates=[],
+            single_rms_mmag=single_rms_mmag,
+        )
+    logger.info("two-component trial: %s", trial)
 
     r_catalogue = r
     if config.eclipse_weight > 1.0:
@@ -573,4 +693,5 @@ def run_staged_fit(
         initial_guess=g,
         config=layered,
         verdict=verdict,
+        two_component_trial=trial,
     )

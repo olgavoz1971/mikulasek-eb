@@ -235,7 +235,7 @@ def fit_borrowed(
         )
 
     amp_scale = amplitude_scale(y)
-    bounds = shape_bounds(amp_scale)
+    bounds = shape_bounds(amp_scale) if config.policy.bounded_solver else None
     r = run(t, y, s, seg)
     res, th = residuals(t, y, s, model, r, seg=seg, order=order)
     oo = out_of_eclipse_phase_mask(th)

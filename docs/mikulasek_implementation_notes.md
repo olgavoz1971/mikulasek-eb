@@ -21,7 +21,7 @@
 | Proximity cosines and O'Connell sine, Eq. 15 | `harmonics=(…)`, `ocon=True` | ✅ | Notation differs: `H<k>` is the amplitude of cos(2πkϑ) (the paper's A<sub>k</sub>), `S1` is sin(2πϑ). Any subset of harmonics is allowed, e.g. the XY Boo model (Eq. 18) uses cos 4πϑ and cos 6πϑ only: `harmonics=(2,3)`. |
 | Phase function ϑ = ϑ₁ − Ṗϑ₁²/2 and Θ(E) = M₀ + P₀E + ½P₀ṖE² (Eqs. 7, 8, 17) | `phase`, `predicted_time` | ✅ | Only the Ṗ term. The paper (footnote 6) quotes the deviation of this approximation from the exact solution for XY Boo: < 1.9×10⁻⁵ in phase and < 0.3 s in time. I have not checked it for larger Ṗ·span. |
 | Instrumental term as a linear combination of functions of time (Eq. 11) | `seg`, `order` | ⚠️ | Polynomials of normalised time per segment only. Not implemented: Legendre or quasi-orthogonal polynomial-harmonic functions; weighted-variance normalisation. The coefficients are eliminated by linear least squares inside every iteration (variable projection) instead of being solved jointly. Point estimates should agree. Parameter uncertainties come from the projected Jacobian (approximately the marginal covariance). I have not checked this against a joint solution. |
-| χ² minimisation and parameter uncertainties (Sect. 5.1) | `fit_global`, `correlation_matrix`, `strong_correlations`, `curve_band`, `ephemeris_at_epoch` | ⚠️ | Simultaneous weighted χ² minimisation of all template, ephemeris and baseline parameters ✅. Optimiser: Levenberg–Marquardt (SciPy, unbounded) instead of Newton–Raphson ⚠️; covariance (JᵀJ)⁻¹ scaled by reduced χ². **Added in this step:** correlation matrix and degeneracy warnings; propagation of the full covariance (general law of error propagation, "with correlations") to the template curve (`curve_band`); orthogonalisation of the ephemeris parameters by re-expressing M₀, P₀ at the epoch where they are uncorrelated (`ephemeris_at_epoch`). Not done: orthogonalisation including Ṗ; propagation to other derived quantities beyond the template band. |
+| χ² minimisation and parameter uncertainties (Sect. 5.1) | `fit_global`, `correlation_matrix`, `strong_correlations`, `curve_band`, `ephemeris_at_epoch` | ⚠️ | Simultaneous weighted χ² minimisation of all template, ephemeris and baseline parameters ✅. Optimiser: Levenberg–Marquardt (SciPy) by default, instead of Newton–Raphson ⚠️. An optional trust-region solver with box bounds is `FitPolicy.bounded_solver` (section 11). After every fit a verdict decides whether the solution may be timed. Covariance (JᵀJ)⁻¹ scaled by reduced χ². **Added in this step:** correlation matrix and degeneracy warnings; propagation of the full covariance (general law of error propagation, "with correlations") to the template curve (`curve_band`); orthogonalisation of the ephemeris parameters by re-expressing M₀, P₀ at the epoch where they are uncorrelated (`ephemeris_at_epoch`). Not done: orthogonalisation including Ṗ; propagation to other derived quantities beyond the template band. |
 | Weights (Sect. 5.2, principle 2) | `sigma`, `rescale`, `fit_global_iterative` | ⚠️ | User-supplied σ<sub>i</sub> plus an optional global factor √(reduced χ²), and now the paper's iterative subset-wise estimate of σ from the residual scatter. Caveat: a model misfit concentrated in a subset is absorbed into that subset's σ. |
 | Parameter economy (Sect. 5.2, principles 3–4) | `free` lists, profile choice | ✅ | The rule "keep a term only if its amplitude exceeds about 3σ and χ² drops clearly" is my formulation of principle 3. |
 | Virtual minima from per-interval O–C shifts (Eq. 9) | `fit_minimum`, `virtual_minima` (fixed template); `fit_global_shifts` (simultaneous) | ⚠️ | See below. |
@@ -233,3 +233,76 @@ visual choice of profile. See `feature_spec.md`, section 12.
 - **Sub-samples.** The exposure average is a midpoint sum over `nsub` samples. With the old minimum of 5 the sharp bottom of a profile with G < 1 produced visible corners in the template (up to 4 mmag at 30 min on NSV 807). The minimum is now 21; the template error against `nsub = 401` is 0.11 mmag. The fit rms barely changed (4.27 to 4.24 mmag), so earlier fits were not materially wrong.
 - **Remaining corners.** A V-shaped minimum smeared by a boxcar becomes flat with corners at plus and minus half the exposure; that is the model, not numerical noise.
 - **Check.** AA And: 30-min borrowed timings minus 2-min timings, primary mean 0.8 s with scatter 1.7 s, secondary mean 0.7 s with scatter 5.8 s (before: 0.7 and 1.9 s, 0.7 and 5.8 s).
+
+## 11. A converged fit is not a solution (2026-11-03)
+
+A least-squares run can return `success` with a template that is not an eclipse. On the two 1800 s light curves of a synthetic detached binary the primary became a needle: depth about 38000 mag and 5400 mag, Gamma about 10⁻⁶ and 10⁻⁵, while the rms on the samples stayed near 24 mmag, because a spike narrower than the exposure falls between the points. Reporting that as a fit is worse than saying that no solution was found. The paper (Sect. 5.1) uses Newton–Raphson and sets no bounds. The limits below are design choices of this package.
+
+### 11.1 What a fit now carries
+
+`assess_fit` (`mikulasek_eb.validity`) looks at the finished template and the data. `fit` stores the result in `solution.stats`:
+
+| Status | Meaning |
+|---|---|
+| `ok` | No check failed. Numerically sound. Not a statement that the fit is good. |
+| `bound-active` | A parameter or a derived width is outside the range allowed for an eclipse. |
+| `unresolved` | The template could not be confirmed: the eclipse core is missed, the exposure integral has not converged, or a core has too few points. |
+
+`status_reasons` says why the status is not `ok`. `status_warnings` does not change the status. `time` raises `UnreliableSolution` unless the status is `ok`, and also when a solution has no status (it was made before this check and must be refitted). `select_model` keeps every candidate in the table and in `result.fits`, and compares BIC only among those whose status is `ok`. If none are `ok`, `best` is `None`.
+
+The checks, in `validity.py`:
+
+| Check | Limit | Effect |
+|---|---|---|
+| Gamma | 0.3 to 30 | `bound-active` if on or outside the edge. Table 1 of the paper has 0.62 to 1.7. |
+| Depth of one profile copy | at most twice the robust peak-to-peak range of the data (percentiles 0.5 and 99.5) | `bound-active`. The second component may be negative, with the same size limit. A is measured from the template mean, so harmonics can push it above the eclipse depth. |
+| Full width at half depth of one copy | at most 0.5 cycles, and at least half the exposure in phase | `bound-active`. Measured on a fine grid. |
+| Width D | 0.001 to 0.5 cycles | A solver box only, and only when the bounded solver is on. The width limit above is the one that judges the eclipse. |
+| Curvature C | outside −0.6 to 0.3 | Warning only. |
+| rms / out-of-eclipse noise | above 1.5 | Warning only. |
+| Rank-deficient Jacobian | | Warning only. The parameter errors are unreliable. |
+| Exposure integral | the model at `nsub` and at `4 nsub`, on 4001 phases, differ by more than the noise | `unresolved`. |
+| Eclipse core | mean residual inside half a data-FWHM of each minimum, at least 3 points, within the larger of 0.2 of the folded depth and 5 standard errors | `unresolved`. |
+
+A value within a small tolerance of an edge counts as on that edge. A bound violation outranks an unresolved check.
+
+### 11.2 The solver
+
+The default is Levenberg–Marquardt, with no bounds during the fit. The verdict is applied afterwards. That is enough to refuse a needle: both 1800 s curves come out `bound-active` and are not timed (`tests/test_validity.py`, marker `slow`).
+
+`FitPolicy.bounded_solver` (default `False`) switches that one fit to the trust-region solver. Depth, width and Gamma are then kept inside the boxes above while the fit runs. D and Gamma are fitted as logarithms, and the covariance is returned in natural units. The verdict still runs afterwards, because a box on D and Gamma cannot express the full-width limit.
+
+The bounded solver was tried as the default and then taken back. On one fit of XY Boo with harmonics (2, 3), the same start:
+
+| Solver | Wall time | Residual evaluations | Status | rms | A | H2 |
+|---|---:|---:|---|---:|---:|---:|
+| Levenberg–Marquardt | 0.40 s | 484 | `ok` | 4.23 mmag | 0.279 | 0.016 |
+| Bounded trust-region | 0.95 s | 168 | `bound-active` | 4.01 mmag | 0.648 | −0.149 |
+
+A and a cosine can cancel. The trust-region solver follows that valley until A sits on the cap (twice the robust range, 0.648 mag). The curve still looks like the star. The eclipse parameters do not describe the eclipse. With the bounded solver every XY Boo candidate was `bound-active`, so `select_model` chose none. Levenberg–Marquardt stops at the paper's set, harmonics (2, 3), and the selection test requires that. The same switch also exchanged the labels of the two primary components of AA And at an unchanged rms; with Levenberg–Marquardt the recorded primary depth matches the reference again. The one gain of the bounded solver was the 1800 s curve at spot longitude 180°, which it recovered to an `ok` fit. That is why it stays available and is not the default.
+
+`examples/inspect_fit.py` shows the two steps on the two 1800 s curves. The first fit is the default solver. When its status is not `ok`, the same configuration is fitted again with `bounded_solver=True`, and both figures are saved (`..._bounded.png`). The comment on `refit_bounded` in that file is the short form of this section. On 2026-11-03 the 180° curve was refused by the default solver (A about 5400 mag, Gamma about 10⁻⁵) and the bounded refit was `ok` at 11.56 mmag. `time` returned 0 primary and 30 secondary: the deep minimum lies at phase 0.5 of the catalogue epoch, so the timed events are the half-integer ones. The 0° bounded refit was still `bound-active`, at 11.58 mmag, because one component had a full width of 0.80 cycles. That run uses `two_comp_max_rel_err=3` so the wide component is kept; the package default of that gate is 0.5.
+
+### 11.3 The second component
+
+A second copy of profile 1 on one minimum is a package extension (section 2.1), not in the 2015 paper. Both copies share the eclipse phase. The acceptance gates are `FitPolicy` fields and are unchanged: rms gain at least 0.25 unless `force_two_component` (which skips only that gain), at least two agreeing starts, D and Gamma of both copies positive, every relative error of A, D and Gamma below `two_comp_max_rel_err` (default 0.5), and the two amplitudes not a cancelling pair. `two_comp_rel_err_scope="core"` applies the relative-error gate only to the narrower copy. The default remains `"all"`.
+
+Every staged fit records `solution.stats["two_component_trial"]`: whether the second copy was tried, whether it was adopted, which gates failed, and the rms it would have given. A disagreement of the eclipse times is stored as `timing_ok` and does not by itself reject the copy.
+
+On the 120 s and 600 s spot curves the core-only gate changed two 600 s fits and none of the 120 s fits. Where a second copy was adopted, the usual shape was a narrow eclipse plus a wide shallow pedestal, and the half-cycle width limit is what then marks the fit `bound-active`. The comparison was made while the bounded solver was the default, so that table does not describe the present solver. The gate defaults were not changed.
+
+### 11.4 One illustration: a spot on a detached binary
+
+PHOEBE light curves of one detached binary, with a spot at longitudes 0° to 315° in steps of 45°, at cadences 120 s, 600 s and 1800 s. This is an illustration of the rules above, not a calibration of the selector.
+
+The harmonic orders are measured only outside the eclipse windows (`propose_candidates`). A detached curve with a flat stretch proposes the significant cosines and no menu. A curve with continuous variation proposes (1, 2, 3) and (2,). The spot-timing runs had locked harmonics (2,) from the spot-free 120 s curve, with the O'Connell term forced on. That is a different experiment from letting each curve choose.
+
+On the 120 s curve at 315°, `select_model` says "continuous variation, unequal depths" and the maxima differ by 39.5 sigma, so the O'Connell term is on. It chooses harmonics (1, 2, 3) and a straight baseline: one component, status `ok`, rms 15.62 mmag, and the second component is not tried (rms/noise below 1.5). The figure `examples/out/fit_from_scratch/h123_b1.png` still shows a residual wave of a few tens of mmag. The same file with only H2 adopts the second component, reaches the same rms, and is `bound-active` because the wide copy has a full width of 0.625 cycles (`h2_b1.png`). Putting H1 in by hand, on the earlier solver, lowered the shoulder rms by about 7 mmag and left the primary time shifted by about 50 s. An even term can lift both shoulders. It cannot move the minimum.
+
+### 11.5 Not done
+
+- The full-width limit is judged after the fit. It is not a constraint inside either solver.
+- The amplitude-cosine cancellation on XY Boo is left as it is. Raising the amplitude cap, or bounding the cosines, was not chosen.
+- A linear inner solution for the amplitudes, the cosines and the baselines is postponed.
+- `min_wall` is still not a field of `TimingRecipe` (`todo.md`).
+- The 27-file status count made before the solver choice was settled is not the result of the present default.

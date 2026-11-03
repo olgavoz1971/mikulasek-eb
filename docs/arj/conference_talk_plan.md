@@ -1,6 +1,6 @@
 # Conference talk: the `mikulasek_eb` implementation (first draft)
 
-Status: first draft, 2026-11-02. Conference name, date and talk length: to be filled in.
+Status: updated 2026-11-03 (evening). The spot-longitude figure is the nine 120 s curves only. The 600 s and 1800 s copies stay for general tests and for the comparison that is not about longitude. Conference name, date and talk length: to be filled in.
 Authors of the plan: Olga Vozyakova and LC_Modeller (AI assistant). To be discussed and edited.
 
 Every completed step is reproducible from this document. A result is recorded only together with the working directory, the Python interpreter, the script and its arguments. Paths that a script fixes internally are named here too. An interactive check that was not saved as a script is marked as such and is not a source for a number in the talk.
@@ -22,19 +22,22 @@ Abstract (draft 2, about 170 words). Square brackets are numbers to fill from th
 > The phenomenological model of Mikulášek (2015) describes an eclipsing binary with a few shape
 > parameters and times the minima by shifting a fixed template. We present a public Python
 > implementation (GitHub link) with model borrowing between light curves of different cadence, an
-> optional second profile component for a distorted minimum, exposure integration for low-cadence
-> data, a preliminary evidence-based choice of the model tuned on synthetic TESS-like light curves,
-> and reproducible fit and timing files. A cool spot near an eclipse makes the time of minimum
-> ambiguous. For a synthetic detached system with one spot at eight longitudes, we compare the
-> geometric time of conjunction, several photometric definitions of the minimum, a Gaussian-process
-> estimate, and the timings of the Mikulášek template and of the Andronov WSAP/WSL methods, at
-> [120, 600 and 1800] s cadence. The offsets are [up to X s] and depend on longitude and on the
-> method. We then show timings of NSV 807 and [two other stars] from several TESS sectors, with
-> the caveats that spots impose on O-C interpretation, and recommend timing unflattened light curves.
+> optional second profile component, exposure integration, a preliminary evidence-based choice of
+> the model tuned on synthetic TESS-like light curves, and reproducible fit and timing files. A
+> cool spot near an eclipse makes the time of minimum ambiguous. For a synthetic detached system
+> with one spot at eight longitudes, observed at 120 s, we compare the geometric time of
+> conjunction, several photometric definitions of the minimum, and the timings of the Mikulášek
+> template and of the Andronov WSAP/WSL methods. The offsets are [up to X s] and depend on
+> longitude and on the method. The same system at 600 s and at 1800 s is used for general tests
+> and for the comparison that is not about longitude, not for the longitude figure. We then show
+> timings of NSV 807 and [two other stars] from several TESS sectors, with the caveats that spots
+> impose on O-C interpretation, and recommend timing unflattened light curves.
 
-Open points: keep or drop the GP in the abstract; name the two other stars or not; whether the
-last clause is a sentence or only a slide; British spelling throughout; length limit of the
-conference abstract (unknown).
+Open points: name the two other stars or not; whether the last clause is a sentence or only a
+slide; British spelling throughout; length limit of the conference abstract (unknown). The GP is
+not in the abstract (`docs/Abstract_Second_draft.md`) and is not on the critical path. That file
+is the researcher's abstract and is not edited from this plan. Its spotted sentence does not name
+a sampling; this plan's draft above is the one that now says 120 s for the longitude figure.
 
 ## 1b. Message
 
@@ -48,6 +51,48 @@ not a recommendation.
 Not the topic of the talk: a general study of TESS detrending. Flattening appears as one practical
 recommendation with one example (slide 9).
 
+## 1c. Goals as of 2026-11-03 (evening)
+
+The scientific point is unchanged. A spot can move the photometric minimum away from the geometric
+conjunction, and two methods can then disagree. The talk is a warning, not a ranking of methods.
+
+The spot test is now smaller:
+
+- The longitude figure uses nine curves at 120 s: the spot-free parent and the eight longitudes.
+- The 600 s and 1800 s copies of the same parents are out of that figure. They stay for general
+  tests and for the comparison that is not about longitude: exposure, the verdict on a needle
+  solution, and the method comparison at more than one sampling. The two 1800 s curves are the
+  fixture that the verdict must refuse. They are not spot-timing results.
+
+Tools we keep, and how the spot test uses them. The write-up is section 11 of
+`docs/mikulasek_implementation_notes.md`.
+
+- The default solver is Levenberg-Marquardt. After every fit a verdict (`ok`, `bound-active`,
+  `unresolved`) decides whether a time may be quoted. A fit that is not `ok` is a blank in the
+  table, with the reason, not a time.
+- The bounded solver stays behind a switch. It is the second look for the two 1800 s curves in
+  the general test. It is not the solver of the spot figure.
+- The second profile component stays gated. The relative-error tolerance stays 0.5 and the gate
+  still looks at all six parameters. Loosening those gates was tried on XY Boo so that a rounder
+  line could be drawn, and it was rejected: the wider copy was not measured.
+- Extra weight on the minima stays opt-in and is not a default. On XY Boo, weight 3 with the
+  cosines and the ephemeris frozen moved Gamma only from 0.63 to 0.69. The binned pattern in the
+  minima stayed, and the rms of the whole curve went from 4.23 mmag to 4.93 mmag. It is not part
+  of the spot recipe. Figure `examples/out/inspect_fit/xy_boo_weighted_minima.png`.
+- Harmonics for a spotted curve are chosen on that curve. Locking them to the spot-free set is a
+  different experiment, already recorded in section 6.4. On the 120 s curve at 315 degrees the
+  curve's own search kept harmonics (1, 2, 3), one component, status `ok`, rms 15.62 mmag
+  (`examples/out/fit_from_scratch/h123_b1.png`). The same file with only H2 adopted a second
+  component and was `bound-active`, because one copy had a full width of 0.625 cycles. The
+  residual wave remains in both figures. The primary offset of about 50 s belongs to the locked
+  H2 run and has not been remeasured on the chosen model.
+- Every timing table for the talk is saved with the fit figure of each row. The 27-file comparison
+  that took about 28 minutes is not repeated. It was also made while the bounded solver was the
+  default, so it does not describe the present solver.
+
+Off the critical path: spot timings at 600 s and at 1800 s; a second component as a default; eclipse
+weighting as a spot correction; the bounded solver as the default; a Gaussian-process minimum.
+
 ## 2. Slide outline
 
 | # | Slide | Content | Evidence in hand |
@@ -56,13 +101,13 @@ recommendation with one example (slide 9).
 | 2 | Design | Layered `Config` (model, data, policy, timing recipe); reproducible solution file with hash and provenance; fail-fast errors, no silent fallbacks; exposure integration for low cadence | `config.py`, `solution.py`, 135 tests |
 | 3 | Features | Second profile component for a minimum; profiles 1 to 7; borrowing a model from a higher cadence; timing options (window, minimum points, opt-in overlap) | sector 4 borrowing picture; G4 two-component results |
 | 4 | Model selection, preliminary | Candidates (harmonics, baseline order, O'Connell) ranked by BIC; the human is asked when the evidence is weak. State clearly what was tested and what was not | scoring harness results on 18 synthetic light curves (`results/synthetic_scoring/`) |
-| 5 | Spots and the time of minimum (synthetic) | One system, one cool spot, longitude sweep. Offsets of several definitions of "minimum" (bisectors at several depths, centroid, lowest point, GP estimate) against `T_conj` and `T_min_pure`; then the three timing methods on the noisy versions. Primary and secondary shown separately | to build (section 3.5, 4.2b); request sent to LC_Generator 2026-11-02 |
+| 5 | Spots and the time of minimum (synthetic) | One system, one cool spot, longitude sweep, **120 s only**. Offsets of several definitions of "minimum" (bisectors at several depths, lowest point) against `T_conj` and `T_min_pure`; then Mikulášek and WSAP/WSL on the same nine noisy curves. Primary and secondary shown separately. A row is shown only with its fit figure, and only when the verdict is `ok` | pure-curve table is in (sections 3.6, 3.7); Mikulášek timings of the nine curves under the current default are the next step (section 1c) |
 | 5b | Timing comparison, other synthetic cases | Mikulášek against WSAP/WSL without spots: bias, scatter, error honesty per method, cadence and window | to build (section 4.3) |
 | 6 | Timing comparison, real | NSV 807, sectors 4, 30, 97: both methods on the same data | timing files in `nsv_807_oc/results/timings/` |
 | 7 | NSV 807 O-C, worked example | Per-eclipse O-C, primary against secondary, changes between sectors; cautious interpretation | section 3 |
 | 8 | Two more stars | Chosen to differ in cadence or period; same treatment | to choose (section 4.5) |
 | 9 | Practical recommendation | Avoid flattening for timing: NSV 807 example where flattening put a wave with the TESS orbital period into O-C | researcher's example; sector 97 flattened and SAP files |
-| 10 | Availability and limits | Repository link, how to run, known limits | section 4.6 |
+| 10 | Availability and limits | Repository link, how to run, known limits, including the verdict: a converged fit is not yet a time | section 4.6; implementation notes section 11 |
 
 Suggested balance: slides 5 to 8 (5 and 5b together) take about half of the time; slides 1 to 4 about a third; slides 9
 and 10 the rest. Slide 4 is one slide only.
@@ -100,7 +145,7 @@ and 10 the rest. Slide 4 is one slide only.
 
 Definitions
 - Geometric minimum: the instant of conjunction (`T_conj` in the synthetic files).
-- Photometric minimum: where the observed minimum looks symmetric or lowest; for a spotless symmetric minimum all definitions agree, for a spot-distorted one they do not. Candidate definitions: lowest point; bisector midpoint at several depths (for example 25, 50, 75 percent); centroid; KvW symmetry point; template shift (Mikulášek, window dependent); asymmetric-polynomial fit of the core (WSAP/WSL).
+- Photometric minimum: where the observed minimum looks symmetric or lowest; for a spotless symmetric minimum all definitions agree, and with a spot they do not. Candidate definitions: lowest point; bisector midpoint at several depths (for example 25, 50, 75 percent); centroid; KvW symmetry point; template shift (Mikulášek, window dependent); WSAP/WSL.
 - `T_min_pure` (bisector of the pure curve) is one of them, not "the" ideal minimum. It stays in the comparison next to `T_conj`: **both truths are used** (two panels).
 - Contact systems have a cusp at mid-eclipse (Gamma < 1), so the lowest point is poorly defined there; bisectors at several depths are more stable.
 
@@ -116,7 +161,7 @@ Spot physics for the discussion
 
 Design of the synthetic experiment (updated after the reply of LC_Generator, 2026-11-02)
 - One system type only, a detached one, so the shift comes from the spot longitude and not from the shape of the eclipse. A contact binary such as G6, and NSV 807 itself, has a cusp at mid-eclipse, so the lowest point is poorly defined: a tiny change at the bottom moves it, and a figure comparing the lowest point, the bisectors and the centroid would mix the cusp with the spot. The detached system has a rounded bottom and clear wings, so a spot on one wing moves the photometric minimum by a measurable amount and the definitions can be compared. This does not mean spots matter only for detached stars. The experiment cannot be quoted for a contact binary; NSV 807 stays a separate, real-data example. LC_Generator therefore did not use G6. The base is a new **short-period detached** system, circular: P = 0.8731 d (not commensurate), q = 0.95, i = 87 deg, fill 0.32 / 0.30, Teff 5800 / 5600 K, blackbody atmospheres. Eclipse depth on the spot-free twin: 0.541 mag.
-- Nine parents with prefix `SP_`: `SP_none` (no spot) and `SP_L000` to `SP_L315` in steps of 45 degrees (one cool spot on the primary, `relteff` 0.82, radius 32, colatitude 50). Observed at 120, 600 and 1800 s with the same seed for every file, so differences come from the spot. 27 accepted files; manifest `results/manifest_spotsweep.csv` in the generator repository. The weak-spot variant (`relteff` 0.92) was skipped.
+- Nine parents with prefix `SP_`: `SP_none` (no spot) and `SP_L000` to `SP_L315` in steps of 45 degrees (one cool spot on the primary, `relteff` 0.82, radius 32, colatitude 50). Observed at 120, 600 and 1800 s with the same seed for every file, so differences come from the spot. 27 accepted files; manifest `results/manifest_spotsweep.csv` in the generator repository. The weak-spot variant (`relteff` 0.92) was skipped. From 2026-11-03 the longitude analysis uses the nine 120 s files only. The 600 s and 1800 s files remain for general tests and for the comparison that is not about longitude (section 1c).
 - PHOEBE spots are fixed (no drift or size change within a light curve), one file per configuration. Longitude 0 faces the companion, 180 faces away; at primary eclipse a spot at 0 is partly hidden, at 180 it is on the visible outer face; 90 and 270 are the O'Connell (quadrature) cases.
 - `T_min_pure` is now defined in the metadata (`t_min_pure_definition`): median of the bisector midpoints at 20, 35, 50, 65 and 80 percent of the way from the local flux minimum to the 90th percentile continuum, on the native-step pure curve in flux. So it is already a multi-depth definition. The spread between the five levels is itself a measure of the asymmetry, and should be kept in the analysis, not only the median.
 - The FWHM label is defined too (`eclipse_fwhm_definition`; flux, 90th percentile continuum); our FWHM will come out 5 to 25 percent smaller for proximity-effect systems, as seen on G4, G5, G6.
@@ -171,21 +216,22 @@ Source of truth for the claims: `Abstract_Second_draft.md` (researcher's version
 | Semi-automatic selection: candidates, BIC, flag for review; preliminary tests on synthetic TESS-like curves | scoring harness on 18 PHOEBE files, regret about 0; flag raised in every case so far | one honest summary table (what was tested, hold-out status); the flag wording matches the code (done in the abstract) | P2, P4 |
 | Reuse of a high-cadence model for lower cadence | S4 borrowed from S30: rms 10.8 to 4.63 mmag | a short, simple-to-use example in the package (public API) | P4 |
 | Second profile component | G4 and G6 results | one clean figure and the statement of limits | P2 |
-| Finite exposure of long-cadence data | `exposure.py`, tests | one demonstration of the effect (smeared against unsmeared fit, 1800 s) | P2 |
+| Finite exposure of long-cadence data | `exposure.py`, tests; the two 1800 s curves are the fixture for the verdict (implementation notes section 11) | one demonstration of the effect (smeared against unsmeared fit, 1800 s), kept in the general tests, not in the spot figure | P2 |
 | Comparison with WSAP/WSL on synthetic TESS-like curves (PHOEBE, noise, instrumental trends) | our timing against truth on G1 to G8 (`timing_vs_truth`) | WSAP/WSL results on the same files; common protocol | P1, P2 |
-| Spotted system, geometric time of conjunction against photometric minimum | 27 `SP_*` files from LC_Generator (received) | all analysis | P1 |
+| Spotted system, geometric time of conjunction against photometric minimum | 27 `SP_*` files received; pure-curve bisectors measured (sections 3.6, 3.7); one 120 s curve (315 degrees) fitted from its own candidate search | Mikulášek timings of the other eight 120 s curves under the current default, each with its fit figure; WSAP/WSL on the same nine files. The 600 s and 1800 s copies are not part of this row | P1 |
 | Real TESS light curves of NSV 807 and two other stars, preliminary O-C with uncertainties | NSV 807: timings for S4, S30 (SPOC, FFI), S97 with ASCII files, window test | WSAP/WSL on the same data; sector 4 on the O-C diagram; flattened pair; two more stars | P3 |
 | Cases where each method performs better | window test (ours) | the common protocol results | P1 to P3 |
 
 ### Phases (order of work)
-- **P1, now: spot sweep (synthetic, first part of the talk).** Steps: (1) first look at the 27 `SP_*` files with the checker and plots; (2) code for the definitions of the minimum on a pure curve (bisectors at several depths, centroid, lowest point) in the package utilities, with tests; (3) our timings of the noisy files at the three cadences, per eclipse type, against `T_conj` and `T_min_pure`; (4) the list of files and the output format for the WSAP/WSL runs of the researcher; (5) the figure: offset against spot longitude, per definition and per method, primary and secondary separately.
-- **P2: common protocol on the wider synthetic set.** Fix protocol (truth, sigma convention, event selection, statistics: bias, scatter, rms(error / actual), rejected fraction); run ours and WSAP/WSL on G1 to G8 and `SP_none`; one table for the selection results; the second component and exposure demonstrations; ask LC_Generator for the hold-out batch only after the protocol is frozen and score it once.
+- **P1, now: spot sweep at 120 s (synthetic, first part of the talk).** The nine curves only. Steps still open: (1) Mikulášek timings under the current default, candidate search on each curve, verdict applied, one fit figure per curve; (2) the table of offsets against `T_conj` and against `T_min_pure`, primary and secondary separately, blanks where the status is not `ok`; (3) the same nine files and the output format for the researcher's WSAP/WSL runs; (4) the figure. Done already: the files, the pure-curve definitions, and the pure-curve table (sections 3.6, 3.7). The 600 s and 1800 s copies are not in these steps.
+- **P2: common protocol on the wider synthetic set.** This is where 600 s and 1800 s belong, together with G1 to G8 and `SP_none`, and not as a longitude figure. Fix protocol (truth, sigma convention, event selection, statistics: bias, scatter, rms(error / actual), rejected fraction); run ours and WSAP/WSL; one table for the selection results; the second component and exposure demonstrations; the 1800 s pair as the case the verdict refuses. Ask LC_Generator for the hold-out batch only after the protocol is frozen and score it once.
 - **P3: real stars.** NSV 807: sector 4 into the O-C (TDB), cross-sector O-C with the cycle count, WSAP/WSL on the same files (researcher), flattened against unflattened sector 97 as one practical example, the sector 97 wave and edge events; choose and process two more stars with the same recipe.
-- **P4: repository and tools.** Commit and push decisions; paths, README, licence, CITATION, tutorial; a simple borrowing example; calibrate or document the review flag; time-scale handling between sectors.
-- **P5 (priority C): separate GP package.** Only if the spot figure needs a shape-agnostic minimum, or after the conference. Read `docs/gp_extrema_modeller.md` in the host application first (it already designs the GP extremum tool).
+- **P4: repository and tools.** Commit and push decisions; paths, README, licence, CITATION, tutorial; a simple borrowing example; calibrate or document the review flag; time-scale handling between sectors. The verdict and the optional bounded solver are described in implementation notes section 11 and still need to be in the public README limits.
+- **P5 (priority C): separate GP package.** Off the critical path. Only if a later figure needs a shape-agnostic minimum, or after the conference. Read `docs/gp_extrema_modeller.md` in the host application first.
 
 ### Next step
-Mikulášek timings of the degraded `SP_*` curves (120, 600 and 1800 s). The script for that run will be named here, with its arguments, before the numbers are quoted.
+
+Nine 120 s curves, nothing else. Current default: Levenberg-Marquardt, the verdict, the candidate search on each curve, the second-component gates unchanged, no extra weight on the minima. Save one fit figure per curve, then one table of primary and secondary offsets against `T_conj` and against `T_min_pure`. A fit that is not `ok` is a blank with its reason. The script is not written yet. It will be named here, with the working directory, the interpreter and the arguments, before any number from it is quoted. The offsets of about 49 s and 51 s in section 6.4 stay with the locked-harmonic run. They are not copied into the new table.
 
 ## 4. Detailed checklists (by topic)
 
@@ -220,18 +266,18 @@ Each item has an owner (O = Olga, M = LC_Modeller) and a priority (A must, B sho
 - [x] Request to LC_Generator written (`agent_mailroom/LC_Modeller_to_LC_Generator_spot_sweep.md`, 2026-11-02) (M).
 - [x] Reply received 2026-11-02: 27 files `SP_*`, detached base, definitions added (section 3.5).
 - [ ] Acknowledge the reply and confirm the files to LC_Generator; ask nothing new unless the first look finds a problem (M).
-- [ ] First look at the sweep files: run the checker, plot the pure curves, check `T_conj` against `T_min_pure` per longitude (M).
+- [x] First look at the sweep files: checker, pure curves, `T_conj` against `T_min_pure` per longitude (M, sections 3.6 and 3.7).
 - [x] Code for the definitions of the minimum on a pure curve (`mikulasek_eb.measure_curve_minimum`: bisectors at 0.20, 0.35, 0.50, 0.65, 0.80, their median, the centroid and the lowest sample; flux or magnitude; tests in `tests/test_curve_minimum.py`) (M, 2026-11-02).
-- [ ] GP-based minimum on the pure and on the noisy curve: decide where the code lives (O + M); reuse the settings of the Dash GP item.
-- [ ] Figure: offset against longitude for each definition, with `T_conj` and `T_min_pure` panels (M).
-- [ ] Run the three timing methods on the noisy versions; same figure with the methods (O supplies the WSAP/WSL results, M the Mikulášek ones).
+- [ ] Figure: offset against longitude for each definition, with `T_conj` and `T_min_pure` panels, 120 s (M). The centroid over the 0.12 window is not used until it has a narrower window (section 3.7).
+- [ ] Mikulášek timings of the nine 120 s curves under the current default, candidate search per curve, one fit figure per row (M). See the next step in section 4a.
+- [ ] WSAP/WSL on the same nine 120 s files (O).
 - [ ] Wording of the warning slide and of the discussion (photometric against geometric minima; spot evolution research against orbital research) (O).
 
 ### 4.3 Timing comparison with WSAP/WSL on synthetic data (A)
 - [ ] Agree the protocol: same light curves, truth `T_min_pure`, same sigma convention, same selection of eclipses (O + M).
-- [ ] Run both methods for each cadence (120 s, 600 s, 1800 s where available) and for the contact, detached and spotted cases.
-- [ ] Report bias, scatter, rms(error / actual) and the fraction of rejected events.
-- [ ] Hold-out batch S01 to S18 from LC_Generator: score once, after the protocol is fixed, no tuning afterwards (M asks LC_Generator).
+- [ ] Run both methods on the general set: G1 to G8 and `SP_none`, at 120 s, 600 s and 1800 s where the files exist. The spotted longitude set in this comparison is the nine 120 s curves only.
+- [ ] Report bias, scatter, rms(error / actual) and the fraction of rejected events. A rejected event includes a fit the verdict did not mark `ok`.
+- [ ] Hold-out batch S01 to S18 from LC_Generator: score once, after the protocol is fixed, no tuning afterwards (M asks LC_Generator). Not started.
 - [ ] Postponed: Gaussian-process template followed by template shifting.
 
 ### 4.4 NSV 807 (A)
@@ -250,7 +296,7 @@ Each item has an owner (O = Olga, M = LC_Modeller) and a priority (A must, B sho
 - [ ] One-page results table: method, light curve, window, n events, median sigma, O-C scatter, rms(O-C/sigma).
 - [ ] The model-borrowing figure (S4 before and after) and the profile-fit figures (`nsv_807_oc/results/step5/`).
 - [ ] Slide 4 wording: "preliminary", with the test set and the hold-out status stated.
-- [ ] Known limits slide: profiles 5 to 7 only through `fit_global`; the staged pipeline does not free the K term; no light-time or apsidal fit; selection tuned on TESS-like synthetic data; the ask-the-human flag is always raised so far (to calibrate).
+- [ ] Known limits slide: profiles 5 to 7 only through `fit_global`; the staged pipeline does not free the K term; no light-time or apsidal fit; selection tuned on TESS-like synthetic data; the ask-the-human flag is always raised so far (to calibrate); a converged fit is timed only when the verdict is `ok` (implementation notes section 11).
 
 ## 5. Risks and open questions
 - "Mikulášek sometimes wins": it must come from the common protocol (4.3) and not from selected cases.
@@ -258,6 +304,8 @@ Each item has an owner (O = Olga, M = LC_Modeller) and a priority (A must, B sho
 - The cause of the S97 wave and of the primary-secondary period difference is open; do not present either as a discovery before the checks in 4.4.
 - Sector 4 uses a constant sigma (3.64 mmag) chosen from the residuals, because the file errors (175 mmag) are unusable; say so on the slide.
 - The spot sweep has one spot size and contrast only; the dependence on contrast is not tested (weak-spot variant skipped). Say so on the slide.
+- The longitude figure is nine curves at 120 s. It does not show how the same spot looks at 600 s or at 1800 s. Say so on the slide.
+- The offsets in section 6.4 were measured with harmonics locked to the spot-free curve. They are not the result of the candidate search the next step will use.
 - Conference details (date, talk length, abstract deadline) decide how much of section 4 is feasible; item priorities should be revisited when they are known.
 
 ## 6. Recipes already run
@@ -337,6 +385,8 @@ MPLBACKEND=Agg $PY examples/spot_degraded_timing.py --cadence 600 1800 --window 
 Trend pictures go to `results/synthetic_scoring/spot_degraded/trends/` and profile pictures to `fits/`. The table is `timing_600_1800_w0.12.csv`. The model structure is chosen on the spot-free 120 s curve and the O'Connell term is kept on; each file is fitted on its own, with its own baseline. The default timing limits (`min_points` 10, `min_each_side` 3, contact walls on) are left unchanged.
 
 That command was run on 2026-11-03 and exited 0. At 600 s the primary biases against conjunction repeat the 120 s pattern (about −49 s at 45° and +51 s at 315°). At 1800 s the global fits and both pictures were written, and every eclipse was rejected: 31 primary and 30 secondary on each file, so the table has no times. The limits were not lowered.
+
+From 2026-11-03 (evening) this 600 s and 1800 s run is a record of a general test, not an input to the longitude figure. The 120 s run in the same section locked the harmonics to the spot-free curve. The next step (section 4a) replaces that 120 s table. It does not rerun 600 s or 1800 s for the spot figure. Later, on the present solver, the two 1800 s curves are the verdict fixture: the default fit is not `ok` and is not timed (implementation notes section 11). The numbers above predate that verdict and are not quoted as present timings.
 
 ## 7. Timeline (to fill in)
 - Abstract deadline: __

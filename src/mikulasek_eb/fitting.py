@@ -90,6 +90,7 @@ class FitResult:
         resid (ndarray): Residuals (mag) after removing the baselines.
         nuis: Baseline bookkeeping used by ``fit_global_iterative``.
         rank_deficient (bool): True if the Jacobian is rank deficient (degenerate parameters).
+        nfev (int): Function evaluations used by the solver.
     """
 
     p: dict
@@ -107,6 +108,7 @@ class FitResult:
     rank_deficient: bool = (
         False  # True if the Jacobian is rank deficient (degenerate parameters)
     )
+    nfev: int = 0
 
 
 def _check_solution(sol, what):
@@ -169,8 +171,9 @@ def _bounded_solve(resid, x0, names, bounds):
         bounds (dict): ``{name: (low, high)}``; names not listed are unbounded.
 
     Returns:
-        SimpleNamespace: ``x``, ``fun``, ``cost`` and ``success``, ``status``, ``message``
-        as ``least_squares`` gives them, and ``jac`` with respect to the natural parameters.
+        SimpleNamespace: ``x``, ``fun``, ``cost``, ``nfev`` and ``success``, ``status``,
+        ``message`` as ``least_squares`` gives them, and ``jac`` with respect to the
+        natural parameters.
     """
     n = len(x0)
     low = np.full(n, -np.inf)
@@ -210,6 +213,7 @@ def _bounded_solve(resid, x0, names, bounds):
         success=sol.success,
         status=sol.status,
         message=sol.message,
+        nfev=int(sol.nfev),
     )
 
 
@@ -316,6 +320,7 @@ def fit_global(
         resid=sol.fun / w,
         nuis=nui,
         rank_deficient=deficient,
+        nfev=int(sol.nfev),
     )
 
 

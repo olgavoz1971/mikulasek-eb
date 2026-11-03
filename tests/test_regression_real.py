@@ -94,10 +94,7 @@ def test_aa_and_adopted_fit(aa_and_run):
     )
     assert ("A1b" in adopted.p) == ref["two_component_adopted"]
     assert adopted.ephem["P0"] == pytest.approx(ref["P0_d"], rel=1e-8)
-    # The two primary components can swap labels (A1 and A1b are exchangeable), so the
-    # recorded A1 belongs to the narrower of the two, whichever name it carries.
-    narrow = min(("", "b"), key=lambda s: adopted.p[f"D1{s}"])
-    assert adopted.p[f"A1{narrow}"] == pytest.approx(ref["A1"], rel=0.02)
+    assert adopted.p["A1"] == pytest.approx(ref["A1"], rel=0.02)
     assert adopted.p["A2"] == pytest.approx(ref["A2"], rel=0.02)
 
 
