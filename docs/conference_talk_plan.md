@@ -327,7 +327,16 @@ cd /home/voz/projects/UPJS/mikulasek_eb
 $PY examples/spot_degraded_timing.py --cadence 120 --window 0.12
 ```
 
-The same command with `--cadence 600 1800` is the rest. Trend pictures go to `results/synthetic_scoring/spot_degraded/trends/` and profile pictures to `fits/`. The table is `timing_<cadences>_w<window>.csv`. The model structure is chosen on the spot-free 120 s curve and the O'Connell term is kept on; each file is fitted on its own, with its own baseline.
+The 600 s and 1800 s run, same structure and the same half-width:
+
+```bash
+cd /home/voz/projects/UPJS/mikulasek_eb
+MPLBACKEND=Agg $PY examples/spot_degraded_timing.py --cadence 600 1800 --window 0.12
+```
+
+Trend pictures go to `results/synthetic_scoring/spot_degraded/trends/` and profile pictures to `fits/`. The table is `timing_600_1800_w0.12.csv`. The model structure is chosen on the spot-free 120 s curve and the O'Connell term is kept on; each file is fitted on its own, with its own baseline. The default timing limits (`min_points` 10, `min_each_side` 3, contact walls on) are left unchanged.
+
+That command was run on 2026-11-03 and exited 0. At 600 s the primary biases against conjunction repeat the 120 s pattern (about −49 s at 45° and +51 s at 315°). At 1800 s the global fits and both pictures were written, and every eclipse was rejected: 31 primary and 30 secondary on each file, so the table has no times. The limits were not lowered.
 
 ## 7. Timeline (to fill in)
 - Abstract deadline: __

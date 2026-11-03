@@ -5,3 +5,7 @@ __pycache__/
 # Publisher PDF: keep a local copy, do not redistribute
 *.pdf
 *~
+*.csv
+results/synthetic_scoring/spot_degraded/fits/120
+results/synthetic_scoring/spot_degraded/fits/600
+results/synthetic_scoring/spot_degraded/fits/1800

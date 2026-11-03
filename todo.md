@@ -217,3 +217,6 @@ Order proposed:
 7. Profiles 5 to 7 (need `fit_global`): low priority, only if something still fails.
 Open, not ours to decide: G7 needs a non-commensurate period and the generator owes the FWHM label definition; pushing the ~20 local commits is the researcher's call.
 Questions to the researcher: trend first or `ask_human` first? Should real stars fit the trend by default (baseline order 1 or 2) or expose it as a visible config choice?
+
+## Tickets
+- 2026-11-03: `min_wall` (3 points on each 90–10% wall) is a default of `virtual_minima` and is not a field of `TimingRecipe`. `time_both_walls` does not pass it, so a caller cannot change it. Window, `min_points` and `min_each_side` are recipe arguments; the 1800 s spot run set only `window=0.12` and therefore kept `min_points=10` and `min_each_side=3`.
