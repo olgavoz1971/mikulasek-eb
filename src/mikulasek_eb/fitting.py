@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from types import SimpleNamespace
 
 import numpy as np
 
@@ -158,6 +159,60 @@ def _cov(sol, dof, rescale):
     return (cov * rchi2 if rescale else cov), chi2, rchi2
 
 
+def _bounded_solve(resid, x0, names, bounds):
+    """Solve with box bounds; widths and Gammas with a bound are fitted as logarithms.
+
+    Args:
+        resid (callable): Residual function of the natural parameter vector.
+        x0 (list of float): Start in natural units, in the order of ``names``.
+        names (list of str): Parameter names.
+        bounds (dict): ``{name: (low, high)}``; names not listed are unbounded.
+
+    Returns:
+        SimpleNamespace: ``x``, ``fun``, ``cost`` and ``success``, ``status``, ``message``
+        as ``least_squares`` gives them, and ``jac`` with respect to the natural parameters.
+    """
+    n = len(x0)
+    low = np.full(n, -np.inf)
+    high = np.full(n, np.inf)
+    use_log = np.zeros(n, dtype=bool)
+    for i, name in enumerate(names):
+        if name in bounds:
+            low[i], high[i] = bounds[name]
+            use_log[i] = name[0] in ("D", "G")
+    start = np.clip(np.asarray(x0, float), low, high)
+    moved = [names[i] for i in range(n) if start[i] != x0[i]]
+    if moved:
+        logger.debug("start moved onto its bounds: %s", moved)
+
+    def to_nat(u):
+        """Natural parameters from the solver vector."""
+        return np.where(use_log, np.exp(np.where(use_log, u, 0.0)), u)
+
+    with np.errstate(divide="ignore"):
+        u0 = np.where(use_log, np.log(np.where(use_log, start, 1.0)), start)
+        low_u = np.where(use_log, np.log(np.where(use_log, low, 1.0)), low)
+        high_u = np.where(use_log, np.log(np.where(use_log, high, 1.0)), high)
+    sol = least_squares(
+        lambda u: resid(to_nat(u)),
+        u0,
+        bounds=(low_u, high_u),
+        method="trf",
+        x_scale="jac",
+        max_nfev=200 * n,
+    )
+    x = to_nat(sol.x)
+    return SimpleNamespace(
+        x=x,
+        fun=sol.fun,
+        cost=sol.cost,
+        jac=sol.jac / np.where(use_log, x, 1.0),
+        success=sol.success,
+        status=sol.status,
+        message=sol.message,
+    )
+
+
 # ------------------------------------------------------------- global fit
 def fit_global(
     t,
@@ -171,6 +226,7 @@ def fit_global(
     seg=None,
     order=0,
     rescale=True,
+    bounds=None,
 ):
     """Simultaneous fit of template parameters and ephemeris to all data.
 
@@ -190,6 +246,11 @@ def fit_global(
         seg (ndarray or None): Segment id per point.
         order (int): Baseline polynomial degree per segment.
         rescale (bool): Rescale the covariance by the reduced chi-square.
+        bounds (dict or None): ``{name: (low, high)}`` for free template parameters, in
+            natural units. None fits without bounds (Levenberg-Marquardt). With bounds the
+            trust-region solver is used, and widths ``D*`` and Gammas ``G*`` that have a
+            bound are fitted as logarithms; errors and covariance are returned for the
+            natural parameters. A start outside its bounds is moved onto the nearest bound.
 
     Returns:
         FitResult: Fitted parameters, errors and diagnostics.
@@ -231,7 +292,10 @@ def fit_global(
         return nui.project(w * (y - F))
 
     x0 = [p0[n] for n in free] + [ephem0[n] for n in fe]
-    sol = least_squares(resid, x0, method="lm", x_scale="jac")
+    if bounds:
+        sol = _bounded_solve(resid, x0, names, bounds)
+    else:
+        sol = least_squares(resid, x0, method="lm", x_scale="jac")
     deficient = _check_solution(sol, "fit_global")
     dof = len(t) - nui.npar - len(x0)
     cov, chi2, rchi2 = _cov(sol, dof, rescale)

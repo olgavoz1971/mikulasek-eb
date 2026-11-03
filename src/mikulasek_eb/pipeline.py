@@ -30,7 +30,7 @@ from .config import Config, FitConfig
 from .errors import ConfigError, InvalidLightCurve, NoValidSolution
 from .exposure import suggest_nsub
 from .fitting import fit_global
-from .validity import FitVerdict, assess_fit
+from .validity import FitVerdict, amplitude_scale, assess_fit, shape_bounds
 
 logger = logging.getLogger(__name__)
 
@@ -232,6 +232,8 @@ def run_staged_fit(
             period_days=period_days,
         )
     hnames = _harmonic_free_names(model)
+    amp_scale = amplitude_scale(mag)
+    bounds = shape_bounds(amp_scale)
     p0 = complete_template(
         dict(A1=g["A1"], A2=g["A2"], D1=D_from_fwhm(g["fwhm"], 1.0), G1=1.0),
         model,
@@ -249,6 +251,7 @@ def run_staged_fit(
         free_ephem,
         seg=seg,
         order=order,
+        bounds=bounds,
     )
     report_fit("1 locate eclipses", r1, nf)
     notify("locate eclipses", 0.15)
@@ -266,6 +269,7 @@ def run_staged_fit(
         free_ephem=free_ephem,
         seg=seg,
         order=order,
+        bounds=bounds,
     )
     for g0, chi2, d1, g1, st in rows:
         logger.info("  G0=%s chi2=%s D1=%s G1=%s %s", g0, chi2, d1, g1, st)
@@ -285,6 +289,7 @@ def run_staged_fit(
         free_ephem,
         seg=seg,
         order=order,
+        bounds=bounds,
     )
     report_fit("3 add C1", r3, nf)
     notify("curvature C1", 0.5)
@@ -307,6 +312,7 @@ def run_staged_fit(
             free_ephem,
             seg=seg,
             order=order,
+            bounds=bounds,
         )
         report_fit("3b C1=C2=0", r, nf)
         free_shape = ["A1", "A2", "D1", "G1", "D2", "G2"] + hnames
@@ -325,6 +331,7 @@ def run_staged_fit(
         free_ephem,
         seg=seg,
         order=order,
+        bounds=bounds,
     )
     report_fit("4 separate eclipse shapes", r4, nf)
     notify("separate eclipse shapes", 0.6)
@@ -369,6 +376,7 @@ def run_staged_fit(
             free_ephem,
             seg=seg_clip,
             order=order,
+            bounds=bounds,
         )
         report_fit("5 after clip", r5, nf)
         notify("outlier clip", 0.7)
@@ -409,6 +417,7 @@ def run_staged_fit(
             seg=seg_work,
             order=order,
             eclipses=config.two_comp_eclipses,
+            bounds=bounds,
         )
         for wf, g2, chi2, rms_mmag, st in tc_rows:
             logger.info(
@@ -520,6 +529,7 @@ def run_staged_fit(
             (),
             seg=seg_work,
             order=order,
+            bounds=bounds,
         )
         report_fit("weighted eclipse shape (H and ephemeris frozen)", r_w, nf)
         res_w, th_w = residuals(
@@ -547,6 +557,7 @@ def run_staged_fit(
         order=order,
         start=g,
         noise=nf,
+        scale=amp_scale,
     )
     notify("done", 1.0)
     return FitPipelineResult(

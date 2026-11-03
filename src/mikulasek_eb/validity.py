@@ -39,13 +39,23 @@ STATUS_UNRESOLVED = "unresolved"
 # contact eclipses with a flat bottom need a large Gamma, hence the high cap.
 GAMMA_MIN = 0.3
 GAMMA_MAX = 30.0
+# Width D of one profile copy (cycles). The ceiling only keeps D finite; the FWHM limit
+# below is the one that judges the eclipse.
+D_MIN = 1e-3
+D_MAX = 0.5
+# A value this close to a bound (relative, absolute for a bound of zero) is on the bound.
+AT_BOUND_REL = 1e-4
+AT_BOUND_ABS = 1e-6
 # Largest full width at half depth of one component (cycles): a primary eclipse of a
 # circular binary cannot be wider than about half an orbit.
 FWHM_MAX = 0.5
 # Smallest full width at half depth, as a fraction of the exposure in phase.
 FWHM_MIN_OVER_EXPOSURE = 0.5
-# Depth of one component against the folded depth of the data.
-DEPTH_MAX_OVER_FOLDED = 1.5
+# Amplitude of one profile copy against the peak-to-peak range of the data. A is measured
+# from the template's out-of-eclipse mean, and harmonics can offset it, so it may exceed the
+# depth below the local continuum (XY Boo does); it cannot exceed the data range by a factor.
+AMPLITUDE_MAX_OVER_RANGE = 2.0
+RANGE_PERCENTILES = (0.5, 99.5)
 # Core of an eclipse for the agreement test, as a fraction of the data FWHM (each side).
 CORE_HALF_OVER_FWHM = 0.5
 # The template may miss the core mean by this fraction of the folded depth.
@@ -193,32 +203,88 @@ def component_fwhm(model: EBModel, comp: dict) -> float:
     return max(float(np.count_nonzero(above)), 1.0) * (phi[1] - phi[0])
 
 
-def _limit_reasons(model: EBModel, p: dict, depth_ref: float, exposure_phase: float | None) -> list[str]:
+def amplitude_scale(mag: np.ndarray) -> float:
+    """Peak-to-peak range of the magnitudes, robust to a few outliers.
+
+    Args:
+        mag (ndarray): Magnitudes.
+
+    Returns:
+        float: Range between the 0.5 and 99.5 percentiles (mag).
+    """
+    low, high = np.percentile(np.asarray(mag, float), RANGE_PERCENTILES)
+    return float(high - low)
+
+
+def shape_bounds(scale: float) -> dict:
+    """Bounds on the eclipse-shape parameters, shared by the solver and the verdict.
+
+    Args:
+        scale (float): ``amplitude_scale`` of the data (mag).
+
+    Returns:
+        dict: ``{name: (low, high)}`` for A, D and G of both eclipses and of their
+        second components. The curvature C and the ephemeris are not bounded.
+    """
+    limit = AMPLITUDE_MAX_OVER_RANGE * scale
+    out = {}
+    for k in (1, 2):
+        out[f"A{k}"] = (0.0, limit)
+        out[f"A{k}b"] = (-limit, limit)
+        for key in (f"{k}", f"{k}b"):
+            out[f"D{key}"] = (D_MIN, D_MAX)
+            out[f"G{key}"] = (GAMMA_MIN, GAMMA_MAX)
+    return out
+
+
+def _on_bound(value: float, low: float, high: float) -> str | None:
+    """Say which bound a value is on or beyond.
+
+    Args:
+        value (float): Parameter value.
+        low (float): Lower bound.
+        high (float): Upper bound.
+
+    Returns:
+        str | None: ``"low"`` or ``"high"``, or None when the value is inside.
+    """
+
+    def close(edge: float) -> bool:
+        """True when the value is within tolerance of the edge."""
+        tol = AT_BOUND_ABS if edge == 0.0 else AT_BOUND_REL * abs(edge)
+        return abs(value - edge) <= tol
+
+    if not np.isfinite(value) or value < low or close(low):
+        return "low"
+    if value > high or close(high):
+        return "high"
+    return None
+
+
+def _limit_reasons(model: EBModel, p: dict, scale: float, exposure_phase: float | None) -> list[str]:
     """Limits on Gamma, FWHM and depth of each profile copy.
 
     Args:
         model (EBModel): Model.
         p (dict): Template parameters.
-        depth_ref (float): Folded depth of the data (mag).
+        scale (float): ``amplitude_scale`` of the data (mag).
         exposure_phase (float | None): Exposure in cycles, or None.
 
     Returns:
         list[str]: One sentence per violated limit.
     """
     reasons = []
+    for key, (low, high) in shape_bounds(scale).items():
+        if key not in p:
+            continue
+        side = _on_bound(float(p[key]), low, high)
+        if side is not None:
+            reasons.append(
+                f"{key}={p[key]:.4g} is on or beyond its {side} bound "
+                f"({low:.4g} to {high:.4g})"
+            )
     for comp in components(model, p):
         name = comp["name"]
-        if not GAMMA_MIN <= comp["G"] <= GAMMA_MAX:
-            reasons.append(
-                f"{name}: Gamma={comp['G']:.3g} outside [{GAMMA_MIN}, {GAMMA_MAX}]"
-            )
-        amp = comp["A"]
-        limit = DEPTH_MAX_OVER_FOLDED * depth_ref
-        if (amp < 0.0 and not comp["signed"]) or abs(amp) > limit:
-            reasons.append(
-                f"{name}: depth A={amp:.4g} mag outside the range allowed by the "
-                f"folded depth {depth_ref:.3f} mag"
-            )
         if comp["D"] <= 0.0:
             reasons.append(f"{name}: width D={comp['D']:.3g} is not positive")
             continue
@@ -320,6 +386,7 @@ def assess_fit(
     order: int = 1,
     start: dict | None = None,
     noise: float | None = None,
+    scale: float | None = None,
 ) -> FitVerdict:
     """Decide whether the adopted template is a believable eclipse model.
 
@@ -335,6 +402,8 @@ def assess_fit(
         start (dict | None): Folded start with ``A1``, ``A2``, ``fwhm``. None measures it
             from the data.
         noise (float | None): Out-of-eclipse noise (mag). None measures it from the data.
+        scale (float | None): ``amplitude_scale`` used for the solver bounds. None measures it
+            from ``mag``.
 
     Returns:
         FitVerdict: Status, reasons and warnings.
@@ -343,11 +412,12 @@ def assess_fit(
     if noise is None:
         ephem0 = dict(M0=g["M0"], P0=period_days, Pdot=0.0)
         noise = noise_floor(t_mjd, mag, mask=out_of_eclipse_mask(t_mjd, ephem0, g["fwhm"]))
-    depth_ref = max(float(g["A1"]), float(g["A2"]))
+    if scale is None:
+        scale = amplitude_scale(mag)
     exposure_phase = (
         None if model.exposure_days is None else model.exposure_days / model.period_days
     )
-    bound_reasons = _limit_reasons(model, result.p, depth_ref, exposure_phase)
+    bound_reasons = _limit_reasons(model, result.p, scale, exposure_phase)
 
     unresolved = []
     with np.errstate(all="ignore"):

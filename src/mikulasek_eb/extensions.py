@@ -28,6 +28,7 @@ def refine_two_component(
     frac=0.3,
     widths=(0.5, 1.5),
     gammas=(0.7, 6.0),
+    bounds=None,
 ):
     """EXTENSION (not in the paper): add a second profile component to the chosen eclipses.
 
@@ -47,6 +48,7 @@ def refine_two_component(
         frac (float): Starting fraction of the amplitude given to the new component.
         widths (tuple of float): Starting width factors for D<k>b relative to D<k>.
         gammas (tuple of float): Starting Gamma values for the new component.
+        bounds (dict or None): Bounds passed to ``fit_global``.
 
     Returns:
         tuple: (best FitResult or None, table of (width factor, Gamma, chi2, rms in mmag, status)).
@@ -72,7 +74,8 @@ def refine_two_component(
             free = list(dict.fromkeys(free_base + newfree))
             try:
                 rr = fit_global(
-                    t, mag, sig, model, p, free, r.ephem, free_eph, seg=seg, order=order
+                    t, mag, sig, model, p, free, r.ephem, free_eph, seg=seg, order=order,
+                    bounds=bounds,
                 )
             except Exception as ex:
                 logger.warning(

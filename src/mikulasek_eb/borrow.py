@@ -33,7 +33,7 @@ from .model import PROFILES, EBModel
 from .solution import ModelSolution, package_version, plain
 from .helpers import out_of_eclipse_phase_mask
 from .tuning import residuals
-from .validity import assess_fit
+from .validity import amplitude_scale, assess_fit, shape_bounds
 
 logger = logging.getLogger(__name__)
 
@@ -231,8 +231,11 @@ def fit_borrowed(
             eph_names,
             seg=gg,
             order=order,
+            bounds=bounds,
         )
 
+    amp_scale = amplitude_scale(y)
+    bounds = shape_bounds(amp_scale)
     r = run(t, y, s, seg)
     res, th = residuals(t, y, s, model, r, seg=seg, order=order)
     oo = out_of_eclipse_phase_mask(th)
@@ -258,7 +261,7 @@ def fit_borrowed(
         two_component="A1b" in r.p,
     )
     stats.update(
-        assess_fit(t, y, s, period, model, r, seg=seg, order=order).to_stats()
+        assess_fit(t, y, s, period, model, r, seg=seg, order=order, scale=amp_scale).to_stats()
     )
     solution = ModelSolution(
         config=config,

@@ -137,6 +137,7 @@ def multistart_global(
     free_ephem=("M0", "P0"),
     seg=None,
     order=1,
+    bounds=None,
 ):
     """Refit from several Gamma starts (D set consistently from the FWHM).
 
@@ -157,6 +158,7 @@ def multistart_global(
         free_ephem (tuple of str): Ephemeris parameters to fit.
         seg (ndarray or None): Baseline segment id per point.
         order (int): Baseline polynomial degree.
+        bounds (dict or None): Bounds passed to ``fit_global``.
 
     Returns:
         tuple: (best FitResult or None, table of (G0, chi2, D1, G1, status)).
@@ -166,7 +168,8 @@ def multistart_global(
         p = dict(p0, G1=G0, D1=D_from_fwhm(fwhm, G0))
         try:
             r = fit_global(
-                t, mag, sig, model, p, free, e0, free_ephem, seg=seg, order=order
+                t, mag, sig, model, p, free, e0, free_ephem, seg=seg, order=order,
+                bounds=bounds,
             )
         except Exception as ex:
             logger.warning("multistart G0=%s failed: %s: %s", G0, type(ex).__name__, ex)

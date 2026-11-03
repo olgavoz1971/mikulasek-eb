@@ -151,12 +151,31 @@ def _fit_generated(relative: str):
 
 @pytest.mark.slow
 @pytest.mark.parametrize("relative", RUNAWAY_1800)
-def test_runaway_1800_curves_are_flagged_and_not_timed(relative):
-    """The two 1800 s curves whose primary ran away are not reported as ok."""
+def test_runaway_1800_curves_never_report_a_needle_as_ok(relative):
+    """On the two curves whose primary used to run away, an ok fit has no needle.
+
+    Whatever the status, a template with Gamma below 0.3 or an amplitude beyond the data
+    range is not ok, and a status that is not ok cannot be timed.
+    """
     out = _fit_generated(relative)
-    assert out.solution.stats["status"] != "ok", out.solution.stats
-    with pytest.raises(UnreliableSolution):
-        eb.time(out.t_mjd, out.mag, out.sig, out.solution)
+    stats, p = out.solution.stats, out.solution.params
+    needle = any(p[k] < validity.GAMMA_MIN for k in p if k[0] == "G")
+    huge = any(abs(p[k]) > 2 * validity.amplitude_scale(out.mag) for k in p if k[0] == "A")
+    if needle or huge:
+        assert stats["status"] != "ok", stats
+    if stats["status"] != "ok":
+        with pytest.raises(UnreliableSolution):
+            eb.time(out.t_mjd, out.mag, out.sig, out.solution)
+    else:
+        assert not needle and not huge
+
+
+@pytest.mark.slow
+def test_runaway_1800_l180_is_recovered_by_the_bounds():
+    """With the bounded solver 1800 s L180 finds a real fit at the noise level."""
+    out = _fit_generated(RUNAWAY_1800[1])
+    assert out.solution.stats["status"] == "ok", out.solution.stats
+    assert out.solution.stats["rms_mag"] < 0.013
 
 
 @pytest.mark.slow

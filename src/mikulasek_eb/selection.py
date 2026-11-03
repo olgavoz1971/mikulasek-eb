@@ -36,7 +36,8 @@ class CandidateRow:
     Attributes:
         name (str): Candidate label.
         config_hash (str): Hash of the candidate configuration.
-        status (str): ``"ok"`` or the exception text.
+        status (str): ``"ok"``, the fit status with its reasons when that is not ok
+            (such a candidate is not compared), or the exception text.
         rms_mmag (float | None): Rms on the common points, mmag.
         k (int | None): Number of fitted parameters including baselines.
         n_common (int | None): Points used in the comparison.
@@ -171,7 +172,15 @@ def select_model(
             fits[cand.name] = fit(
                 t_mjd, mag, sig, period_days, epoch_jd, cand.config, data_id=data_id
             )
-            table.append(CandidateRow(cand.name, cand.config.config_hash(), "ok"))
+            verdict = fits[cand.name].solution.stats
+            if verdict["status"] == "ok":
+                row_status = "ok"
+            else:
+                row_status = (
+                    f"{verdict['status']}: " + "; ".join(verdict["status_reasons"])
+                )
+                logger.warning("candidate %s is %s", cand.name, row_status)
+            table.append(CandidateRow(cand.name, cand.config.config_hash(), row_status))
         except MikulasekError as ex:
             logger.warning(
                 "candidate %s failed: %s: %s", cand.name, type(ex).__name__, ex
