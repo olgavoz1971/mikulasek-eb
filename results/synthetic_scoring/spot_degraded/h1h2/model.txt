@@ -1,0 +1,2 @@
+ModelSpec(profile=1, harmonics=(1, 2), ocon=True, kterm=False)
+TimingRecipe(window=0.12, baseline_order=1, max_sigma_factor=5.0, require_contact_walls=True, clip_outliers=True, local_windows=(0.15, 0.1, 0.06), min_points=10, min_each_side=3, allow_overlapping_windows=False, template='own')

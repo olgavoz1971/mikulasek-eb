@@ -30,6 +30,11 @@ LINE_ADOPTED_WIDTH = 2.0
 LINE_TIME_SERIES_WIDTH = 0.8
 
 
+# Zoomed minima: primary points stay blue, secondary points are orange.
+POINT_PRIMARY_COLOUR = "C0"
+POINT_SECONDARY_COLOUR = "C1"
+
+
 # Full folded panel (not the primary zoom): two cycles so Min II at ±0.5 is interior.
 FOLD_PHASE_MIN = -1.0
 
@@ -78,6 +83,34 @@ def replicate_folded_points(
     return (phi_out, *extras)
 
 
+def _secondary_offset(phi: np.ndarray) -> np.ndarray:
+    """Phase distance from the secondary minimum.
+
+    ``phi`` is folded into ``[-0.5, 0.5]``. The secondary sits at both edges.
+
+    Args:
+        phi (ndarray): Folded phase (cycles).
+
+    Returns:
+        ndarray: Offset from phase 0.5, in ``[-0.5, 0.5]``.
+    """
+    return np.where(phi >= 0.0, phi - 0.5, phi + 0.5)
+
+
+def _draw_template(ax, x, y, *, colour, width, label):
+    """Draw one template curve.
+
+    Args:
+        ax: Matplotlib axes.
+        x (ndarray): Horizontal coordinate.
+        y (ndarray): Template magnitude.
+        colour (str): Line colour. The same function keeps this colour in every panel.
+        width (float): Line width.
+        label (str | None): Legend entry. None draws the line without a new name.
+    """
+    ax.plot(x, y, color=colour, lw=width, zorder=5 if colour == LINE_ADOPTED_COLOUR else 4, label=label)
+
+
 def plot_global_fit(
     t_jd: np.ndarray,
     mag: np.ndarray,
@@ -94,9 +127,13 @@ def plot_global_fit(
     save_path: str | None = None,
     note: str | None = None,
 ) -> None:
-    """Plot time series, fold, primary zoom, and residuals (matplotlib).
+    """Plot time series, fold, both minima, and residuals (matplotlib).
 
-    Overlays single-component and adopted templates when they differ.
+    The adopted template is the red line in every panel. The single-component
+    template is the grey line, and only when its parameters differ. One
+    component therefore has no grey line. The zoom panel shows the primary and
+    the secondary against phase measured from each minimum's own centre, with
+    those same two lines.
 
     Args:
         t_jd (ndarray): Absolute Julian Date for the time axis.
@@ -120,8 +157,49 @@ def plot_global_fit(
     zoom = np.linspace(-PRIMARY_PHASE_ZOOM_HALF, PRIMARY_PHASE_ZOOM_HALF, 2000)
     mag_corr = mag - (yhat - f_template)
     same = p_single is p_adopted or p_single == p_adopted
+    # Default matplotlib size is 10 pt. Twice that, for this figure only.
+    style = {
+        "font.size": 20,
+        "axes.labelsize": 20,
+        "axes.titlesize": 22,
+        "legend.fontsize": 18,
+        "xtick.labelsize": 18,
+        "ytick.labelsize": 18,
+    }
 
-    fig, axes = plt.subplots(4, 1, figsize=(16, 20), sharex=False)
+    with plt.rc_context(style):
+        _draw_global_fit(
+            t_jd, mag, sig, yhat, phi, phi_grid, zoom, mag_corr,
+            same, model, p_single, p_adopted, seg, title, timescale, save_path, note,
+        )
+
+
+def _draw_global_fit(
+    t_jd, mag, sig, yhat, phi, phi_grid, zoom, mag_corr,
+    same, model, p_single, p_adopted, seg, title, timescale, save_path, note,
+) -> None:
+    """Draw the four panels. Called with the enlarged font already set.
+
+    Args:
+        t_jd (ndarray): Absolute Julian Date.
+        mag (ndarray): Observed magnitudes.
+        sig (ndarray): Magnitude uncertainties.
+        yhat (ndarray): Full adopted prediction.
+        phi (ndarray): Phase folded into one cycle.
+        phi_grid (ndarray): Fine phase grid for the folded panel.
+        zoom (ndarray): Phase offset grid for a minimum, centred on zero.
+        mag_corr (ndarray): Magnitudes with the baseline removed.
+        same (bool): True when the single-component and adopted parameters match.
+        model (EBModel): Fitted model.
+        p_single (dict): Single-component parameters.
+        p_adopted (dict): Adopted parameters.
+        seg (ndarray | None): Baseline segment indices.
+        title (str): Figure title.
+        timescale (str | None): Time-scale name for the axis.
+        save_path (str | None): File to write.
+        note (str | None): Figure subtitle.
+    """
+    fig, axes = plt.subplots(4, 1, figsize=(16, 24), sharex=False)
     ax = axes[0]
     ax.errorbar(
         t_jd,
@@ -186,7 +264,7 @@ def plot_global_fit(
             color=LINE_SINGLE_COLOUR,
             lw=LINE_SINGLE_WIDTH,
             zorder=4,
-            label="earlier template",
+            label="single-component",
         )
     ax.plot(
         phi_grid,
@@ -204,37 +282,52 @@ def plot_global_fit(
 
     ax = axes[2]
     in_p = np.abs(phi) < PRIMARY_PHASE_ZOOM_HALF
+    sec_off = _secondary_offset(phi)
+    in_s = np.abs(sec_off) < PRIMARY_PHASE_ZOOM_HALF
     ax.errorbar(
         phi[in_p],
         mag_corr[in_p],
         yerr=sig[in_p],
         fmt="o",
-        ms=3,
+        ms=4,
         alpha=0.5,
         elinewidth=0.4,
         capsize=0,
-        color="C0",
+        color=POINT_PRIMARY_COLOUR,
         zorder=1,
         label="primary",
     )
-    ax.plot(
-        zoom,
-        model(zoom, p_single),
-        color=LINE_SINGLE_COLOUR,
-        lw=LINE_SINGLE_WIDTH,
-        zorder=4,
-        label="single-component",
+    ax.errorbar(
+        sec_off[in_s],
+        mag_corr[in_s],
+        yerr=sig[in_s],
+        fmt="s",
+        ms=4,
+        alpha=0.5,
+        elinewidth=0.4,
+        capsize=0,
+        color=POINT_SECONDARY_COLOUR,
+        zorder=1,
+        label="secondary",
     )
     if not same:
-        ax.plot(
-            zoom,
-            model(zoom, p_adopted),
-            color=LINE_ADOPTED_COLOUR,
-            lw=LINE_ADOPTED_WIDTH,
-            zorder=5,
-            label="adopted",
+        _draw_template(
+            ax, zoom, model(zoom, p_single),
+            colour=LINE_SINGLE_COLOUR, width=LINE_SINGLE_WIDTH, label="single-component",
         )
-    ax.set_xlabel("Phase (primary)")
+        _draw_template(
+            ax, zoom, model(0.5 + zoom, p_single),
+            colour=LINE_SINGLE_COLOUR, width=LINE_SINGLE_WIDTH, label=None,
+        )
+    _draw_template(
+        ax, zoom, model(zoom, p_adopted),
+        colour=LINE_ADOPTED_COLOUR, width=LINE_ADOPTED_WIDTH, label="adopted fit",
+    )
+    _draw_template(
+        ax, zoom, model(0.5 + zoom, p_adopted),
+        colour=LINE_ADOPTED_COLOUR, width=LINE_ADOPTED_WIDTH, label=None,
+    )
+    ax.set_xlabel("Phase from minimum centre")
     ax.set_ylabel("Magnitude (template scale)")
     ax.invert_yaxis()
     ax.legend()

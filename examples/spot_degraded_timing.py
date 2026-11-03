@@ -66,11 +66,14 @@ def rows_for(cadence: int) -> list[dict]:
         return [r for r in csv.DictReader(fh) if int(r["cadence_s"]) == cadence and int(r["fail"]) == 0]
 
 
-def structure_from_spot_free(window: float) -> Config:
+def structure_from_spot_free(window: float, harmonics: tuple[int, ...] | None = None) -> Config:
     """Model structure chosen on the spot-free 120 s curve, with the O'Connell term on.
 
     Args:
         window (float): Timing half-width (cycles).
+        harmonics (tuple[int, ...] | None): Cosine orders to use instead of the selected
+            set. None keeps the selection. A value is a deliberate departure from
+            "structure from the spot-free curve" and must be run as its own arm.
 
     Returns:
         Config: Structure. The data layer is replaced per file.
@@ -86,9 +89,13 @@ def structure_from_spot_free(window: float) -> Config:
         raise RuntimeError("no model chosen for the spot-free curve")
     cfg = res.output.solution.config
     logger.info("spot-free selection %s; O'Connell forced on", res.best.name)
+    model = dataclasses.replace(cfg.model, ocon=True)
+    if harmonics is not None:
+        logger.warning("harmonics replaced by %s (selected %s)", harmonics, cfg.model.harmonics)
+        model = dataclasses.replace(model, harmonics=harmonics)
     return dataclasses.replace(
         cfg,
-        model=dataclasses.replace(cfg.model, ocon=True),
+        model=model,
         timing=TimingRecipe(window=window),
     ).validate()
 
@@ -138,8 +145,22 @@ def time_file(path: Path, structure: Config, out_dir: Path) -> list[dict]:
         save_path=str(fits / f"{path.stem}.png"),
     )
     recipe = dataclasses.replace(config.timing, window=config.timing.window)
-    timings = time_eclipses(out.t_mjd, out.mag, out.sig, out.solution, recipe)
     meta = synthetic.meta
+    status = out.solution.stats["status"]
+    if status != "ok":
+        logger.error(
+            "%s fit status %s, not timed: %s",
+            path.stem, status, "; ".join(out.solution.stats["status_reasons"]),
+        )
+        return [
+            dict(
+                file=path.name, physics=meta.get("physics_id"),
+                cadence_s=int(_num(meta, "cadence_s")), kind=kind, n=0,
+                n_rejected=0, window=config.timing.window, status=status,
+            )
+            for kind in ("primary", "secondary")
+        ]
+    timings = time_eclipses(out.t_mjd, out.mag, out.sig, out.solution, recipe)
     origin = float(synthetic.timesys["timeorigin"])
     kinds = [k.strip() for k in str(meta["eclipse_kind"]).split(",")]
     tmin = _array(meta, "eclipse_T_min_pure_days")
@@ -155,7 +176,7 @@ def time_file(path: Path, structure: Config, out_dir: Path) -> list[dict]:
         base = dict(
             file=path.name, physics=meta.get("physics_id"), cadence_s=int(_num(meta, "cadence_s")),
             kind=kind, n=0, n_rejected=len(timings.rejected[kind]),
-            window=config.timing.window,
+            window=config.timing.window, status=status,
         )
         if len(measured) == 0 or len(pure) == 0:
             rows.append(base)
@@ -187,25 +208,31 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--cadence", type=int, nargs="+", required=True, help="Cadence in seconds, one or more of 120 600 1800.")
     parser.add_argument("--window", type=float, default=0.12, help="Timing half-width in cycles. Default 0.12.")
+    parser.add_argument("--harmonics", type=int, nargs="+", default=None, help="Replace the selected cosine orders, e.g. 1 2. Needs --arm.")
+    parser.add_argument("--arm", default=None, help="Sub-folder of the output for a run that departs from the default structure.")
     args = parser.parse_args()
-    OUT.mkdir(parents=True, exist_ok=True)
-    (OUT / "command.txt").write_text(" ".join(sys.argv) + "\n")
-    structure = structure_from_spot_free(args.window)
-    (OUT / "model.txt").write_text(repr(structure.model) + "\n" + repr(structure.timing) + "\n")
+    if args.harmonics is not None and not args.arm:
+        parser.error("--harmonics changes the structure; give it its own --arm folder")
+    out_dir = OUT / args.arm if args.arm else OUT
+    out_dir.mkdir(parents=True, exist_ok=True)
+    (out_dir / "command.txt").write_text(" ".join(sys.argv) + "\n")
+    harmonics = tuple(args.harmonics) if args.harmonics is not None else None
+    structure = structure_from_spot_free(args.window, harmonics)
+    (out_dir / "model.txt").write_text(repr(structure.model) + "\n" + repr(structure.timing) + "\n")
     rows = []
     for cadence in args.cadence:
         for row in rows_for(cadence):
-            rows.extend(time_file(GENERATED / row["path"], structure, OUT))
+            rows.extend(time_file(GENERATED / row["path"], structure, out_dir))
     fields = [
-        "file", "physics", "cadence_s", "kind", "n", "n_rejected", "window",
+        "file", "physics", "cadence_s", "status", "kind", "n", "n_rejected", "window",
         "bias_vs_conj_s", "bias_vs_pure_s", "scatter_vs_pure_s", "median_sigma_s", "honesty_vs_pure",
     ]
-    destination = OUT / ("timing_" + "_".join(str(c) for c in args.cadence) + f"_w{args.window}.csv")
+    destination = out_dir / ("timing_" + "_".join(str(c) for c in args.cadence) + f"_w{args.window}.csv")
     with open(destination, "w", newline="") as fh:
         writer = csv.DictWriter(fh, fields, extrasaction="ignore")
         writer.writeheader()
         writer.writerows(rows)
-    logger.info("wrote %s, %s and %s", destination, OUT / "trends", OUT / "fits")
+    logger.info("wrote %s, %s and %s", destination, out_dir / "trends", out_dir / "fits")
 
 
 if __name__ == "__main__":

@@ -220,3 +220,5 @@ Questions to the researcher: trend first or `ask_human` first? Should real stars
 
 ## Tickets
 - 2026-11-03: `min_wall` (3 points on each 90–10% wall) is a default of `virtual_minima` and is not a field of `TimingRecipe`. `time_both_walls` does not pass it, so a caller cannot change it. Window, `min_points` and `min_each_side` are recipe arguments; the 1800 s spot run set only `window=0.12` and therefore kept `min_points=10` and `min_each_side=3`.
+
+- 2026-11-03: after the verdict in `validity.py`: (1) bounded `trf` fit with D and Gamma in logs; (2) linear inner solve for A, H, S, baselines (regression against the 120 s and 600 s tables first); (3) the sine part of the 45 degree spot wave; (4) make `min_wall` a field of `TimingRecipe` (ticket above).

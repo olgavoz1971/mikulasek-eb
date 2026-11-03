@@ -30,6 +30,7 @@ from .config import Config, FitConfig
 from .errors import ConfigError, InvalidLightCurve, NoValidSolution
 from .exposure import suggest_nsub
 from .fitting import fit_global
+from .validity import FitVerdict, assess_fit
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +51,8 @@ class FitPipelineResult:
         noise_floor (float): Out-of-eclipse noise (mag).
         initial_guess (dict): Folded start (M0, A1, A2, fwhm).
         config (Config): The full layered configuration used (provenance).
+        verdict (FitVerdict | None): Status of the adopted template (``ok``,
+            ``bound-active`` or ``unresolved``). Always set by ``run_staged_fit``.
     """
 
     model: EBModel
@@ -63,6 +66,7 @@ class FitPipelineResult:
     noise_floor: float
     initial_guess: dict
     config: Config
+    verdict: FitVerdict | None = None
 
 
 def _shape_free_names(r, model: EBModel) -> list[str]:
@@ -532,6 +536,18 @@ def run_staged_fit(
         )
         r = r_w
 
+    verdict = assess_fit(
+        t_work,
+        mag_work,
+        sig_work,
+        period_days,
+        model,
+        r,
+        seg=seg_work,
+        order=order,
+        start=g,
+        noise=nf,
+    )
     notify("done", 1.0)
     return FitPipelineResult(
         model=model,
@@ -545,4 +561,5 @@ def run_staged_fit(
         noise_floor=nf,
         initial_guess=g,
         config=layered,
+        verdict=verdict,
     )

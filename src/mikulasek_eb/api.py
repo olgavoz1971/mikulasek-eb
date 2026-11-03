@@ -18,6 +18,7 @@ from .errors import InvalidLightCurve
 from .pipeline import FitPipelineResult, run_staged_fit
 from .solution import ModelSolution, package_version, plain
 from .tom import time_with_recipe
+from .validity import require_ok
 
 logger = logging.getLogger(__name__)
 
@@ -159,6 +160,9 @@ def solution_from_pipeline(
         rank_deficient=adopted.rank_deficient,
         two_component="A1b" in adopted.p,
     )
+    if result.verdict is None:
+        raise ValueError("The pipeline result has no fit verdict.")
+    stats.update(result.verdict.to_stats())
     exposure = (
         None
         if model.exposure_days is None
@@ -260,9 +264,12 @@ def time(
         TimingOutput: Timings and rejected events per eclipse type.
 
     Raises:
+        UnreliableSolution: If the solution status is not ``ok`` (``bound-active``,
+            ``unresolved`` or missing). Nothing is timed from such a template.
         InvalidLightCurve: If the input is invalid.
         ConfigError: If the recipe is invalid.
     """
+    require_ok(solution.stats)
     prov = solution.provenance
     validate_lightcurve(t_mjd, mag, sig, prov["period_input_days"], prov["epoch_jd"])
     recipe = solution.config.timing if recipe is None else recipe

@@ -96,8 +96,10 @@ from .errors import (
     InvalidLightCurve,
     MikulasekError,
     NoValidSolution,
+    UnreliableSolution,
 )
 from .solution import ModelSolution
+from .validity import FitVerdict, assess_fit
 from .features import Features, FeatureSettings, extract_features
 from .candidates import Candidate, RuleSettings, propose_candidates, review_features
 from .selection import CandidateRow, SelectionResult, select_model
@@ -148,6 +150,9 @@ __all__ = [
     "FitCancelled",
     "InvalidLightCurve",
     "NoValidSolution",
+    "UnreliableSolution",
+    "FitVerdict",
+    "assess_fit",
     "Config",
     "ConfigError",
     "DataSetup",

@@ -27,5 +27,12 @@ class NoValidSolution(MikulasekError, RuntimeError):
     """The search finished without any acceptable (finite, positive-width) solution."""
 
 
+class UnreliableSolution(MikulasekError, RuntimeError):
+    """A solution converged but is not a believable eclipse model; it must not be timed.
+
+    Raised by ``time`` when the fit status is ``bound-active``, ``unresolved`` or missing.
+    """
+
+
 class FitCancelled(MikulasekError, RuntimeError):
     """A progress hook asked to stop the fit (raise this from the hook to cancel)."""

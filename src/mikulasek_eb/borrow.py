@@ -33,6 +33,7 @@ from .model import PROFILES, EBModel
 from .solution import ModelSolution, package_version, plain
 from .helpers import out_of_eclipse_phase_mask
 from .tuning import residuals
+from .validity import assess_fit
 
 logger = logging.getLogger(__name__)
 
@@ -255,6 +256,9 @@ def fit_borrowed(
         n_clipped=n_clip,
         rank_deficient=r.rank_deficient,
         two_component="A1b" in r.p,
+    )
+    stats.update(
+        assess_fit(t, y, s, period, model, r, seg=seg, order=order).to_stats()
     )
     solution = ModelSolution(
         config=config,

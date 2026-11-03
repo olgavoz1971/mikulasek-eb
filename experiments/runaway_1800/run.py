@@ -1,10 +1,8 @@
 """Experiment on the 1800 s spot curves whose primary ran away.
 
-The staged fit is applied to longitude 0 and 180 degrees. The second pass wraps
-``fit_global``. A step is rejected when the template range on a fine phase grid
-is more than three times the range at the data phases. The parameters of the
-previous accepted step are kept. Pictures and a table go to
-``experiments/runaway_1800/out/``.
+The second pass holds every eclipse-shape parameter that leaves a wide physical
+interval, and refits the rest. The intervals are stated below. Pictures and a
+table go to ``experiments/runaway_1800/out/``.
 
 Run from the repository root::
 
@@ -13,13 +11,10 @@ Run from the repository root::
 
 from __future__ import annotations
 
-import copy
 import csv
 import dataclasses
 import logging
 from pathlib import Path
-
-import numpy as np
 
 import mikulasek_eb.extensions as extensions
 import mikulasek_eb.fitting as fitting
@@ -31,7 +26,6 @@ from mikulasek_eb.config import Config, FitPolicy, ModelSpec, TimingRecipe
 from mikulasek_eb.features import extract_features
 from mikulasek_eb.helpers import absolute_jd_to_mjd, predicted_magnitude
 from mikulasek_eb.io import load_tess_votable
-from mikulasek_eb.model import phase
 from mikulasek_eb.plotting import plot_global_fit
 
 logger = logging.getLogger(__name__)
@@ -42,101 +36,104 @@ FILES = (
     "results/detached/detached_none_nooconnell_SP_L000_SP_L000_1800_c1800.vot",
     "results/detached/detached_none_nooconnell_SP_L180_SP_L180_1800_c1800.vot",
 )
-# A real eclipse has almost the same range on the grid and at the samples.
-# The needles on these two curves are hundreds of times larger on the grid.
-PEAK_RATIO = 3.0
-GRID_N = 8001
+# Wide intervals for this experiment, in magnitudes and in cycles. Gamma from 0.3
+# still includes the paper's cusp (Figure 1 draws 1/2) and excludes the needle.
+# The second-component amplitude may be negative. Harmonics are not bounded here.
+SHAPE_BOUNDS = {
+    "A1": (1e-4, 3.0),
+    "A2": (1e-4, 3.0),
+    "A1b": (-3.0, 3.0),
+    "A2b": (-3.0, 3.0),
+    "D1": (0.005, 0.25),
+    "D2": (0.005, 0.25),
+    "D1b": (0.005, 0.25),
+    "D2b": (0.005, 0.25),
+    "G1": (0.3, 6.0),
+    "G2": (0.3, 6.0),
+    "G1b": (0.3, 6.0),
+    "G2b": (0.3, 6.0),
+    "C1": (-2.0, 2.0),
+    "C2": (-2.0, 2.0),
+}
 _REAL_FIT = fitting.fit_global
 _GUARD = False
-_STATE = {"last": None, "reverted": 0, "unresolved": False}
+_STATE = {"held": 0}
 
 
-def _span(values: np.ndarray) -> float:
-    """Difference between the largest and smallest finite value.
-
-    Args:
-        values (ndarray): Model values (mag).
-
-    Returns:
-        float: Range (mag). Zero when no value is finite.
-    """
-    finite = np.asarray(values, float)
-    finite = finite[np.isfinite(finite)]
-    if len(finite) == 0:
-        return 0.0
-    return float(np.max(finite) - np.min(finite))
-
-
-def _ranges(model, result, t) -> tuple[float, float]:
-    """Template range on a fine phase grid and at the phases of the data.
+def _outside(parameters: dict) -> dict:
+    """Parameters that lie outside ``SHAPE_BOUNDS``.
 
     Args:
-        model (EBModel): Model that was fitted.
-        result (FitResult): Parameters of this step.
-        t (ndarray): Times of this step (days).
+        parameters (dict): Template parameters of one step.
 
     Returns:
-        tuple[float, float]: Grid range and sample range, in magnitudes.
+        dict: Name to the bound it is held at.
     """
-    ephem = result.ephem
-    theta = phase(t, ephem["M0"], ephem["P0"], ephem.get("Pdot", 0.0))
-    phi = theta - np.round(theta)
-    grid = np.linspace(-0.5, 0.5, GRID_N)
-    return _span(model(grid, result.p)), _span(model(phi, result.p))
+    held = {}
+    for name, (low, high) in SHAPE_BOUNDS.items():
+        if name not in parameters:
+            continue
+        value = parameters[name]
+        if value < low:
+            held[name] = low
+        elif value > high:
+            held[name] = high
+    return held
 
 
-def _rejected(grid_span: float, sample_span: float) -> bool:
-    """Decide whether the curve between the samples outgrows the samples.
+def _call_fit(args, kwargs, p0, free):
+    """Call the real fit with a replaced starting template and free list.
 
     Args:
-        grid_span (float): Template range on the fine grid (mag).
-        sample_span (float): Template range at the data phases (mag).
+        args (tuple): Original positional arguments.
+        kwargs (dict): Original keyword arguments.
+        p0 (dict): Starting template.
+        free (list): Template names still free.
 
     Returns:
-        bool: True when the grid range exceeds ``PEAK_RATIO`` times the sample range.
+        FitResult: Refit.
     """
-    return grid_span > PEAK_RATIO * max(sample_span, 1e-4)
+    if "p0" in kwargs or "free" in kwargs:
+        updated = dict(kwargs)
+        updated["p0"] = p0
+        updated["free"] = free
+        return _REAL_FIT(*args, **updated)
+    updated = list(args)
+    updated[4] = p0
+    updated[5] = free
+    return _REAL_FIT(*updated, **kwargs)
 
 
 def _guarded_fit_global(*args, **kwargs):
-    """Fit one step, and keep the previous accepted step when the grid test fails.
+    """Fit one step, and repeat it with out-of-range shape parameters held.
 
     Args:
         *args: Positional arguments of ``fit_global``.
         **kwargs: Keyword arguments of ``fit_global``.
 
     Returns:
-        FitResult: This step, or a copy of the last step that passed the grid test.
+        FitResult: The free fit, or the refit with parameters held on the bound.
     """
     result = _REAL_FIT(*args, **kwargs)
     if not _GUARD:
         return result
-    t = np.asarray(kwargs.get("t", args[0]), float)
-    model = kwargs.get("model", args[3])
-    grid_span, sample_span = _ranges(model, result, t)
-    rank = bool(result.rank_deficient)
-    if not _rejected(grid_span, sample_span):
-        if rank:
-            logger.warning(
-                "rank deficient, grid %.4g mag agrees with samples %.4g mag; step kept",
-                grid_span,
-                sample_span,
-            )
-        _STATE["last"] = result
-        return result
-    logger.warning(
-        "step rejected: grid %.4g mag, samples %.4g mag, rank_deficient=%s",
-        grid_span,
-        sample_span,
-        rank,
-    )
-    if _STATE["last"] is None:
-        logger.error("no previous accepted step; this solution stays unresolved")
-        _STATE["unresolved"] = True
-        return result
-    _STATE["reverted"] += 1
-    logger.warning("keeping the previous accepted step (%d reverted)", _STATE["reverted"])
-    return copy.deepcopy(_STATE["last"])
+    free0 = list(kwargs.get("free", args[5]))
+    held_at = {}
+    for _ in range(4):
+        held = _outside(result.p)
+        if not held:
+            return result
+        held_at.update(held)
+        p0 = dict(result.p)
+        p0.update(held_at)
+        free = [name for name in free0 if name not in held_at]
+        logger.warning("holding %s at the bound and refitting", held)
+        _STATE["held"] += len(held)
+        result = _call_fit(args, kwargs, p0, free)
+    still = _outside(result.p)
+    if still:
+        logger.error("still outside after holding: %s", still)
+    return result
 
 
 def _install_guard() -> None:
@@ -148,10 +145,8 @@ def _install_guard() -> None:
 
 
 def _reset_state() -> None:
-    """Clear the accepted step before a new light curve."""
-    _STATE["last"] = None
-    _STATE["reverted"] = 0
-    _STATE["unresolved"] = False
+    """Clear the held-parameter count before a new light curve."""
+    _STATE["held"] = 0
 
 
 def _config_for(path: Path) -> Config:
@@ -183,10 +178,10 @@ def _one(path: Path, label: str) -> dict:
 
     Args:
         path (Path): Light curve.
-        label (str): ``current`` or ``grid_check``.
+        label (str): ``current`` or ``bounded``.
 
     Returns:
-        dict: Adopted parameters, ranges, and whether a step was reverted.
+        dict: Adopted shape parameters and how many were held at a bound.
     """
     _reset_state()
     payload = load_tess_votable(path)
@@ -201,7 +196,6 @@ def _one(path: Path, label: str) -> dict:
         out.t_mjd, out.mag, out.sig, model, adopted.p, adopted.ephem,
         out.pipeline.seg, config.data.baseline_order,
     )
-    grid_span, sample_span = _ranges(model, adopted, out.t_mjd)
     picture = OUT / f"{path.stem}_{label}.png"
     plot_global_fit(
         mjd_to_jd(out.t_mjd), out.mag, out.sig, yhat, template, theta, model,
@@ -216,26 +210,23 @@ def _one(path: Path, label: str) -> dict:
         A1=adopted.p.get("A1"),
         G1=adopted.p.get("G1"),
         D1=adopted.p.get("D1"),
+        C1=adopted.p.get("C1"),
         A2=adopted.p.get("A2"),
         G2=adopted.p.get("G2"),
         rms_mmag=1e3 * float(adopted.rms),
-        grid_span_mag=grid_span,
-        sample_span_mag=sample_span,
-        rank_deficient=bool(adopted.rank_deficient),
-        n_reverted=_STATE["reverted"],
-        unresolved=_STATE["unresolved"],
-        flagged=_rejected(grid_span, sample_span),
+        n_held=_STATE["held"],
+        outside=";".join(_outside(adopted.p)),
     )
     logger.info(
-        "%s %s A1=%.4g G1=%.4g grid=%.3g sample=%.3g reverted=%d flagged=%s",
-        path.stem, label, row["A1"], row["G1"], grid_span, sample_span,
-        row["n_reverted"], row["flagged"],
+        "%s %s A1=%.4g G1=%.4g D1=%.4g rms=%.2f mmag held=%d outside=%s",
+        path.stem, label, row["A1"], row["G1"], row["D1"], row["rms_mmag"],
+        row["n_held"], row["outside"] or "none",
     )
     return row
 
 
 def main() -> None:
-    """Fit both curves with the current solver and with the grid check."""
+    """Fit both curves with the current solver and with the shape bounds."""
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     _install_guard()
     OUT.mkdir(parents=True, exist_ok=True)
@@ -248,7 +239,7 @@ def main() -> None:
         _GUARD = False
         rows.append(_one(path, "current"))
         _GUARD = True
-        rows.append(_one(path, "grid_check"))
+        rows.append(_one(path, "bounded"))
     destination = OUT / "comparison.csv"
     with open(destination, "w", newline="") as fh:
         writer = csv.DictWriter(fh, list(rows[0]))
