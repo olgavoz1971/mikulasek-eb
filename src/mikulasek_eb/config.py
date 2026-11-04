@@ -113,6 +113,10 @@ class FitPolicy:
         bounded_solver (bool): Use the trust-region solver with box bounds on the
             eclipse shape. The default is False: Levenberg-Marquardt, with the
             same limits applied afterwards by the verdict.
+        retry_bound_active (bool): When a Levenberg-Marquardt fit is marked
+            ``bound-active``, ``select_model`` fits that same candidate again
+            with the trust-region solver. The default is True. Starting with
+            the trust-region solver stays off.
     """
 
     gamma_starts: tuple = (0.5, 1, 2, 4, 8)
@@ -132,6 +136,7 @@ class FitPolicy:
     two_comp_eclipses: tuple = (1,)
     two_comp_timing_agreement_sigma_max: float = 1.0
     bounded_solver: bool = False
+    retry_bound_active: bool = True
 
 
 @dataclass(frozen=True)
@@ -200,6 +205,7 @@ class FitConfig:
     two_comp_eclipses: tuple = (1,)
     two_comp_timing_agreement_sigma_max: float = 1.0
     bounded_solver: bool = False
+    retry_bound_active: bool = True
 
 
 def _layer_from_dict(cls, data: dict, layer: str):
@@ -309,6 +315,8 @@ class Config:
             raise ConfigError("force_two_component requires allow_two_component.")
         if not isinstance(p.bounded_solver, bool):
             raise ConfigError("bounded_solver must be true or false.")
+        if not isinstance(p.retry_bound_active, bool):
+            raise ConfigError("retry_bound_active must be true or false.")
         if p.two_comp_rel_err_scope not in ("all", "core"):
             raise ConfigError("two_comp_rel_err_scope must be 'all' or 'core'.")
         if p.two_comp_min_agreeing_starts < 1:
@@ -323,7 +331,11 @@ class Config:
             )
         if any(not 0 < w <= MAX_WINDOW for w in t.local_windows):
             raise ConfigError(f"timing local_windows must be in (0, {MAX_WINDOW}].")
-        if t.min_points < 3 or t.min_each_side < 1 or 2 * t.min_each_side > t.min_points:
+        if (
+            t.min_points < 3
+            or t.min_each_side < 1
+            or 2 * t.min_each_side > t.min_points
+        ):
             raise ConfigError(
                 "timing min_points must be >= 3, min_each_side >= 1 and "
                 "2 * min_each_side <= min_points."

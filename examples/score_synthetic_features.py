@@ -8,7 +8,7 @@ Writes ``results/synthetic_scoring/features_vs_labels.md`` and ``.csv``.
 Run::
 
     python examples/score_synthetic_features.py
-    python examples/score_synthetic_features.py /path/to/EB_synthetic_lc/results
+    python examples/score_synthetic_features.py /path/to/EB_synthetic_lc/results/n01
 """
 
 from __future__ import annotations
@@ -27,7 +27,8 @@ from mikulasek_eb.io import load_tess_votable
 from mikulasek_eb.synthetic_check import _flag, _num, load_synthetic
 
 logger = logging.getLogger(__name__)
-DEFAULT_RESULTS = Path("/home/voz/projects/UPJS/EB_synthetic_lc/results")
+GENERATOR = Path("/home/voz/projects/UPJS/EB_synthetic_lc")
+DEFAULT_RESULTS = GENERATOR / "results" / "n01"
 OUT = ROOT / "results" / "synthetic_scoring"
 
 
@@ -125,7 +126,7 @@ def main() -> None:
         manifest = [r for r in csv.DictReader(fh) if int(r["fail"]) == 0]
     rows, failures = [], []
     for m in manifest:
-        path = results.parent / m["path"]
+        path = GENERATOR / m["path"]
         logger.info("Scoring %s", path.name)
         try:
             rows.append(score_file(path))

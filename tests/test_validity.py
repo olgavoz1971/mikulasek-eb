@@ -16,11 +16,11 @@ from mikulasek_eb.model import EBModel, phase
 
 GENERATED = Path("/home/voz/projects/UPJS/EB_synthetic_lc")
 RUNAWAY_1800 = (
-    "results/detached/detached_none_nooconnell_SP_L000_SP_L000_1800_c1800.vot",
-    "results/detached/detached_none_nooconnell_SP_L180_SP_L180_1800_c1800.vot",
+    "results/n01/detached/detached_none_nooconnell_SP_L000_SP_L000_1800_c1800.vot",
+    "results/n01/detached/detached_none_nooconnell_SP_L180_SP_L180_1800_c1800.vot",
 )
 SPOT_FREE_120 = (
-    "results/detached/detached_none_nooconnell_SP_none_SP_none_120_c120.vot"
+    "results/n01/detached/detached_none_nooconnell_SP_none_SP_none_120_c120.vot"
 )
 
 NORMAL = dict(A1=0.5, A2=0.4, D1=0.02, G1=1.0, C1=0.0, D2=0.02, G2=1.0, C2=0.0)
@@ -58,7 +58,12 @@ def test_core_scope_checks_the_narrower_component():
     assert label == "narrower component"
     assert names == ("A1b", "D1b", "G1b")
     assert _rel_err_names({"D1": 0.016, "D1b": 0.13}, "all")[1] == (
-        "A1", "D1", "G1", "A1b", "D1b", "G1b",
+        "A1",
+        "D1",
+        "G1",
+        "A1b",
+        "D1b",
+        "G1b",
     )
 
 
@@ -158,7 +163,12 @@ def _fit_generated(relative: str):
         eb.TimingRecipe(window=0.12),
     )
     return eb.fit(
-        t, payload["mag"], payload["sig"], payload["period"], payload["epoch_jd"], cfg,
+        t,
+        payload["mag"],
+        payload["sig"],
+        payload["period"],
+        payload["epoch_jd"],
+        cfg,
         data_id=path.stem,
     )
 

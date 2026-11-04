@@ -26,7 +26,7 @@ from pathlib import Path
 
 import numpy as np
 from features_table import ROOT  # noqa: F401
-from score_synthetic_fits import DEFAULT_RESULTS, OUT, build_library
+from score_synthetic_fits import GENERATOR, DEFAULT_RESULTS, OUT, build_library
 
 from mikulasek_eb import select_model, time as time_eclipses
 from mikulasek_eb.errors import InvalidLightCurve
@@ -63,15 +63,23 @@ def score_file(path: Path) -> list[dict]:
     origin = float(d.timesys["timeorigin"])
     payload = load_tess_votable(path)
     t = absolute_jd_to_mjd(payload["t"])
-    feats = extract_features(t, payload["mag"], payload["sig"], payload["period"], payload["epoch_jd"])
+    feats = extract_features(
+        t, payload["mag"], payload["sig"], payload["period"], payload["epoch_jd"]
+    )
     lib = [
         c
         for c in build_library(feats)
         if c.config.data.baseline_order == 1 and not c.config.model.ocon
     ]
     res = select_model(
-        t, payload["mag"], payload["sig"], payload["period"], payload["epoch_jd"],
-        features=feats, candidates=lib, data_id=path.stem,
+        t,
+        payload["mag"],
+        payload["sig"],
+        payload["period"],
+        payload["epoch_jd"],
+        features=feats,
+        candidates=lib,
+        data_id=path.stem,
     )
     if res.best is None:
         raise ValueError("no candidate fitted")
@@ -133,14 +141,24 @@ def main() -> None:
     for m in manifest:
         if filters and not any(f in m["path"] for f in filters):
             continue
-        path = DEFAULT_RESULTS.parent / m["path"]
+        path = GENERATOR / m["path"]
         logger.warning("Timing %s", path.name)
         try:
             rows += score_file(path)
         except (InvalidLightCurve, ValueError) as exc:
             failures.append((path.name, f"{type(exc).__name__}: {exc}"))
-    cols = ["file", "kind", "chosen", "n", "n_rejected", "bias_s", "scatter_s",
-            "median_sigma_s", "honesty", "conj_offset_s"]
+    cols = [
+        "file",
+        "kind",
+        "chosen",
+        "n",
+        "n_rejected",
+        "bias_s",
+        "scatter_s",
+        "median_sigma_s",
+        "honesty",
+        "conj_offset_s",
+    ]
     OUT.mkdir(parents=True, exist_ok=True)
     with open(OUT / "timing_vs_truth.csv", "w", newline="") as fh:
         w = csv.DictWriter(fh, fieldnames=cols, extrasaction="ignore")

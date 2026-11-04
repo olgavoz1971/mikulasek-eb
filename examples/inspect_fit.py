@@ -31,8 +31,10 @@ HERE = Path(__file__).resolve().parent
 OUT = HERE / "out" / "inspect_fit"
 GENERATED = Path("/home/voz/projects/UPJS/EB_synthetic_lc")
 SPOT_FILES = (
-    GENERATED / "results/detached/detached_none_nooconnell_SP_L000_SP_L000_1800_c1800.vot",
-    GENERATED / "results/detached/detached_none_nooconnell_SP_L180_SP_L180_1800_c1800.vot",
+    GENERATED
+    / "results/n01/detached/detached_none_nooconnell_SP_L000_SP_L000_1800_c1800.vot",
+    GENERATED
+    / "results/n01/detached/detached_none_nooconnell_SP_L180_SP_L180_1800_c1800.vot",
 )
 XY_BOO = HERE.parent / "data" / "lc_discovery_TIC_347405567_TESS_SPOC_sector_50.vot"
 
@@ -65,7 +67,11 @@ def spot_config(payload: dict, t_mjd) -> eb.Config:
 
 
 def save_figure(
-    out: eb.FitOutput, title: str, path: Path, timescale: str | None, note: str | None = None
+    out: eb.FitOutput,
+    title: str,
+    path: Path,
+    timescale: str | None,
+    note: str | None = None,
 ) -> None:
     """Save the four-panel profile figure for one fit.
 
@@ -79,13 +85,30 @@ def save_figure(
     adopted = out.pipeline.adopted
     model = out.solution.build_model()
     yhat, template, theta = predicted_magnitude(
-        out.t_mjd, out.mag, out.sig, model, adopted.p, adopted.ephem,
-        out.pipeline.seg, out.solution.config.data.baseline_order,
+        out.t_mjd,
+        out.mag,
+        out.sig,
+        model,
+        adopted.p,
+        adopted.ephem,
+        out.pipeline.seg,
+        out.solution.config.data.baseline_order,
     )
     plot_global_fit(
-        eb.mjd_to_jd(out.t_mjd), out.mag, out.sig, yhat, template, theta, model,
-        out.pipeline.single_component.p, adopted.p, out.pipeline.seg, title,
-        timescale=timescale, save_path=str(path), note=note,
+        eb.mjd_to_jd(out.t_mjd),
+        out.mag,
+        out.sig,
+        yhat,
+        template,
+        theta,
+        model,
+        out.pipeline.single_component.p,
+        adopted.p,
+        out.pipeline.seg,
+        title,
+        timescale=timescale,
+        save_path=str(path),
+        note=note,
     )
     logger.info("figure %s", path)
 
@@ -109,7 +132,8 @@ def report(out: eb.FitOutput, name: str) -> None:
     if trial:
         logger.info(
             "  two-component %s (single %.2f mmag, trial %s)",
-            trial["reason"], trial["single_rms_mmag"],
+            trial["reason"],
+            trial["single_rms_mmag"],
             "not run" if trial["rms_mmag"] is None else f"{trial['rms_mmag']:.2f} mmag",
         )
         for gate in trial["failed_gates"]:
@@ -121,7 +145,9 @@ def report(out: eb.FitOutput, name: str) -> None:
         return
     logger.info(
         "%s timed: %d primary, %d secondary",
-        name, len(timed.timings["primary"]["T"]), len(timed.timings["secondary"]["T"]),
+        name,
+        len(timed.timings["primary"]["T"]),
+        len(timed.timings["secondary"]["T"]),
     )
 
 
@@ -138,8 +164,13 @@ def fit_file(path: Path, config: eb.Config) -> eb.FitOutput:
     payload = eb.load_tess_votable(path)
     t_mjd = eb.absolute_jd_to_mjd(payload["t"])
     out = eb.fit(
-        t_mjd, payload["mag"], payload["sig"], payload["period"], payload["epoch_jd"],
-        config, data_id=path.stem,
+        t_mjd,
+        payload["mag"],
+        payload["sig"],
+        payload["period"],
+        payload["epoch_jd"],
+        config,
+        data_id=path.stem,
     )
     report(out, path.stem)
     save_figure(
@@ -180,8 +211,13 @@ def refit_bounded(path: Path, payload: dict, t_mjd, config: eb.Config) -> eb.Fit
         config, policy=dataclasses.replace(config.policy, bounded_solver=True)
     )
     out = eb.fit(
-        t_mjd, payload["mag"], payload["sig"], payload["period"], payload["epoch_jd"],
-        bounded, data_id=path.stem + "_bounded",
+        t_mjd,
+        payload["mag"],
+        payload["sig"],
+        payload["period"],
+        payload["epoch_jd"],
+        bounded,
+        data_id=path.stem + "_bounded",
     )
     report(out, path.stem + " bounded")
     save_figure(
@@ -222,7 +258,11 @@ def inspect_xy_boo() -> None:
     payload = eb.load_tess_votable(XY_BOO)
     t_mjd = eb.absolute_jd_to_mjd(payload["t"])
     result = eb.select_model(
-        t_mjd, payload["mag"], payload["sig"], payload["period"], payload["epoch_jd"],
+        t_mjd,
+        payload["mag"],
+        payload["sig"],
+        payload["period"],
+        payload["epoch_jd"],
         data_id=XY_BOO.stem,
     )
     for row in result.table:
@@ -240,7 +280,9 @@ def inspect_xy_boo() -> None:
             OUT / f"xy_boo_{name}.png",
             payload.get("timescale"),
         )
-    forced_two_component(payload, t_mjd, None if result.best is None else result.best.config)
+    forced_two_component(
+        payload, t_mjd, None if result.best is None else result.best.config
+    )
     weighted_minima(payload, t_mjd, None if result.best is None else result.best.config)
 
 
@@ -262,9 +304,15 @@ def weighted_minima(payload: dict, t_mjd, chosen: eb.Config | None) -> None:
     if chosen is None:
         logger.info("XY Boo: no model was chosen, so the minima were not reweighted")
         return
-    policy = dataclasses.replace(chosen.policy, eclipse_weight=3.0, eclipse_phase_half=0.12)
+    policy = dataclasses.replace(
+        chosen.policy, eclipse_weight=3.0, eclipse_phase_half=0.12
+    )
     _fit_forced(
-        payload, t_mjd, chosen, policy, "xy_boo_weighted_minima",
+        payload,
+        t_mjd,
+        chosen,
+        policy,
+        "xy_boo_weighted_minima",
         note="One component. Minima weight 3; cosines and ephemeris frozen.",
     )
 
@@ -286,7 +334,9 @@ def forced_two_component(payload: dict, t_mjd, chosen: eb.Config | None) -> None
         chosen (Config | None): The chosen configuration. None means nothing was chosen.
     """
     if chosen is None:
-        logger.info("XY Boo: no model was chosen, so the second component was not forced")
+        logger.info(
+            "XY Boo: no model was chosen, so the second component was not forced"
+        )
         return
     for eclipses, tag in (((1,), "primary"), ((1, 2), "both")):
         policy = dataclasses.replace(
@@ -308,7 +358,11 @@ def forced_two_component(payload: dict, t_mjd, chosen: eb.Config | None) -> None
 
 
 def _fit_forced(
-    payload: dict, t_mjd, chosen: eb.Config, policy: eb.FitPolicy, stem: str,
+    payload: dict,
+    t_mjd,
+    chosen: eb.Config,
+    policy: eb.FitPolicy,
+    stem: str,
     note: str | None = None,
 ) -> eb.FitOutput:
     """Fit one forced two-component configuration and save its figure.
@@ -323,8 +377,13 @@ def _fit_forced(
     """
     config = dataclasses.replace(chosen, policy=policy)
     out = eb.fit(
-        t_mjd, payload["mag"], payload["sig"], payload["period"], payload["epoch_jd"],
-        config, data_id=stem,
+        t_mjd,
+        payload["mag"],
+        payload["sig"],
+        payload["period"],
+        payload["epoch_jd"],
+        config,
+        data_id=stem,
     )
     report(out, stem)
     save_figure(

@@ -20,7 +20,7 @@ import sys
 from pathlib import Path
 
 import numpy as np
-from score_synthetic_fits import DEFAULT_RESULTS, OUT, build_library
+from score_synthetic_fits import GENERATOR, DEFAULT_RESULTS, OUT, build_library
 from features_table import ROOT  # noqa: F401
 
 from mikulasek_eb import select_model
@@ -57,15 +57,23 @@ def score_file(path: Path) -> list[dict]:
     mag = c - 2.5 * np.log10(flux_clean)
     truth = c - 2.5 * np.log10(d.truth_flux)
     t = absolute_jd_to_mjd(payload["t"])
-    feats = extract_features(t, mag, payload["sig"], payload["period"], payload["epoch_jd"])
+    feats = extract_features(
+        t, mag, payload["sig"], payload["period"], payload["epoch_jd"]
+    )
     lib = [
         dataclasses.replace(cand)
         for cand in build_library(feats)
         if cand.config.data.baseline_order == 0
     ]
     res = select_model(
-        t, mag, payload["sig"], payload["period"], payload["epoch_jd"],
-        features=feats, candidates=lib, data_id=path.stem,
+        t,
+        mag,
+        payload["sig"],
+        payload["period"],
+        payload["epoch_jd"],
+        features=feats,
+        candidates=lib,
+        data_id=path.stem,
     )
     noise = 1e3 * float(np.std(mag - truth))
     rows = []
@@ -78,8 +86,13 @@ def score_file(path: Path) -> list[dict]:
             rms = 1e3 * float(np.sqrt(np.mean((fit_mag - truth[idx]) ** 2)))
         rows.append(
             dict(
-                file=path.name, candidate=row.name, status=row.status, k=row.k,
-                rms_shape=rms, noise=noise, bic=row.bic,
+                file=path.name,
+                candidate=row.name,
+                status=row.status,
+                k=row.k,
+                rms_shape=rms,
+                noise=noise,
+                bic=row.bic,
                 chosen=bool(res.best is not None and row.name == res.best.name),
             )
         )
@@ -96,7 +109,7 @@ def main() -> None:
     for m in manifest:
         if filters and not any(f in m["path"] for f in filters):
             continue
-        path = DEFAULT_RESULTS.parent / m["path"]
+        path = GENERATOR / m["path"]
         print_name = path.name
         logger.warning("Scoring %s", print_name)
         try:
@@ -108,7 +121,10 @@ def main() -> None:
         w = csv.DictWriter(fh, fieldnames=list(rows[0]))
         w.writeheader()
         w.writerows(rows)
-    lines = ["| File | Noise mmag | Chosen | rms shape chosen | Best | rms shape best |", "|---|---|---|---|---|---|"]
+    lines = [
+        "| File | Noise mmag | Chosen | rms shape chosen | Best | rms shape best |",
+        "|---|---|---|---|---|---|",
+    ]
     for name in dict.fromkeys(r["file"] for r in rows):
         fr = [r for r in rows if r["file"] == name and r["rms_shape"] is not None]
         best = min(fr, key=lambda r: r["rms_shape"])

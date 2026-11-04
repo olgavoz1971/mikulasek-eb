@@ -23,12 +23,14 @@ logger = logging.getLogger(__name__)
 HERE = Path(__file__).resolve().parent
 OUT = HERE / "out" / "fit_from_scratch"
 CURVE = Path(
-    "/home/voz/projects/UPJS/EB_synthetic_lc/results/detached/"
+    "/home/voz/projects/UPJS/EB_synthetic_lc/results/n01/detached/"
     "detached_none_nooconnell_SP_L315_SP_L315_120_c120.vot"
 )
 
 
-def save_figure(out: eb.FitOutput, title: str, path: Path, timescale: str | None) -> None:
+def save_figure(
+    out: eb.FitOutput, title: str, path: Path, timescale: str | None
+) -> None:
     """Save the four-panel profile figure for one fit.
 
     Args:
@@ -40,13 +42,29 @@ def save_figure(out: eb.FitOutput, title: str, path: Path, timescale: str | None
     adopted = out.pipeline.adopted
     model = out.solution.build_model()
     yhat, template, theta = predicted_magnitude(
-        out.t_mjd, out.mag, out.sig, model, adopted.p, adopted.ephem,
-        out.pipeline.seg, out.solution.config.data.baseline_order,
+        out.t_mjd,
+        out.mag,
+        out.sig,
+        model,
+        adopted.p,
+        adopted.ephem,
+        out.pipeline.seg,
+        out.solution.config.data.baseline_order,
     )
     plot_global_fit(
-        eb.mjd_to_jd(out.t_mjd), out.mag, out.sig, yhat, template, theta, model,
-        out.pipeline.single_component.p, adopted.p, out.pipeline.seg, title,
-        timescale=timescale, save_path=str(path),
+        eb.mjd_to_jd(out.t_mjd),
+        out.mag,
+        out.sig,
+        yhat,
+        template,
+        theta,
+        model,
+        out.pipeline.single_component.p,
+        adopted.p,
+        out.pipeline.seg,
+        title,
+        timescale=timescale,
+        save_path=str(path),
     )
     logger.info("figure %s", path)
 
@@ -62,7 +80,11 @@ def report(out: eb.FitOutput, name: str) -> None:
     model = out.solution.config.model
     logger.info(
         "%s harmonics=%s O'Connell=%s status=%s rms=%.2f mmag two-component=%s",
-        name, model.harmonics, model.ocon, stats["status"], 1e3 * stats["rms_mag"],
+        name,
+        model.harmonics,
+        model.ocon,
+        stats["status"],
+        1e3 * stats["rms_mag"],
         out.solution.stats["two_component"],
     )
     for reason in stats["status_reasons"]:
@@ -73,7 +95,8 @@ def report(out: eb.FitOutput, name: str) -> None:
     if trial:
         logger.info(
             "  two-component %s (single %.2f mmag, trial %s)",
-            trial["reason"], trial["single_rms_mmag"],
+            trial["reason"],
+            trial["single_rms_mmag"],
             "not run" if trial["rms_mmag"] is None else f"{trial['rms_mmag']:.2f} mmag",
         )
         for gate in trial["failed_gates"]:
@@ -85,7 +108,9 @@ def report(out: eb.FitOutput, name: str) -> None:
         return
     logger.info(
         "%s timed: %d primary, %d secondary",
-        name, len(timed.timings["primary"]["T"]), len(timed.timings["secondary"]["T"]),
+        name,
+        len(timed.timings["primary"]["T"]),
+        len(timed.timings["secondary"]["T"]),
     )
 
 
@@ -98,7 +123,11 @@ def main() -> None:
     payload = eb.load_tess_votable(CURVE)
     t_mjd = eb.absolute_jd_to_mjd(payload["t"])
     result = eb.select_model(
-        t_mjd, payload["mag"], payload["sig"], payload["period"], payload["epoch_jd"],
+        t_mjd,
+        payload["mag"],
+        payload["sig"],
+        payload["period"],
+        payload["epoch_jd"],
         data_id=CURVE.stem,
     )
     for cand in result.candidates:
@@ -108,7 +137,9 @@ def main() -> None:
         rms = None if fitted is None else 1e3 * fitted.solution.stats["rms_mag"]
         logger.info(
             "fitted %s: status=%s rms=%s mmag",
-            row.name, row.status, "none" if rms is None else f"{rms:.2f}",
+            row.name,
+            row.status,
+            "none" if rms is None else f"{rms:.2f}",
         )
     if result.best is None:
         logger.info("no candidate was chosen")

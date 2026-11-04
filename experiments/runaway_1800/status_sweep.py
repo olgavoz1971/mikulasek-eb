@@ -25,7 +25,7 @@ from mikulasek_eb.io import load_tess_votable
 
 logger = logging.getLogger(__name__)
 GENERATED = Path("/home/voz/projects/UPJS/EB_synthetic_lc")
-MANIFEST = GENERATED / "results" / "manifest_spotsweep.csv"
+MANIFEST = GENERATED / "results" / "n01" / "manifest_spotsweep.csv"
 OUT = Path(__file__).resolve().parent / "out" / "status_sweep.csv"
 
 
@@ -69,8 +69,13 @@ def main() -> None:
         payload = load_tess_votable(path)
         t = absolute_jd_to_mjd(payload["t"])
         out = eb.fit(
-            t, payload["mag"], payload["sig"], payload["period"], payload["epoch_jd"],
-            config_for(payload, t), data_id=path.stem,
+            t,
+            payload["mag"],
+            payload["sig"],
+            payload["period"],
+            payload["epoch_jd"],
+            config_for(payload, t),
+            data_id=path.stem,
         )
         stats = out.solution.stats
         table.append(

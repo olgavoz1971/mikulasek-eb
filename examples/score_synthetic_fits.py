@@ -36,7 +36,8 @@ from mikulasek_eb.io import load_tess_votable
 from mikulasek_eb.synthetic_check import load_synthetic
 
 logger = logging.getLogger(__name__)
-DEFAULT_RESULTS = Path("/home/voz/projects/UPJS/EB_synthetic_lc/results")
+GENERATOR = Path("/home/voz/projects/UPJS/EB_synthetic_lc")
+DEFAULT_RESULTS = GENERATOR / "results" / "n01"
 OUT = ROOT / "results" / "synthetic_scoring"
 HARMONIC_SETS = ((), (2,), (2, 3), (1, 2, 3))
 BASELINE_ORDERS = (0, 1)
@@ -57,7 +58,12 @@ def build_library(features, rules=None) -> list:
     for harm in HARMONIC_SETS:
         for order in BASELINE_ORDERS:
             for ocon in (False, True):
-                name = "h" + "".join(map(str, harm)) + f"_b{order}" + ("_oc" if ocon else "")
+                name = (
+                    "h"
+                    + "".join(map(str, harm))
+                    + f"_b{order}"
+                    + ("_oc" if ocon else "")
+                )
                 cfg = dataclasses.replace(
                     base,
                     model=ModelSpec(profile=1, harmonics=harm, ocon=ocon),
@@ -91,8 +97,13 @@ def noise_free_mag(path: Path, payload: dict):
         raise ValueError("point counts of the flux and magnitude readers differ")
     c = payload["mag"] + 2.5 * np.log10(d.flux)
     if np.ptp(c) > 1e-6:
-        raise ValueError(f"mag = c - 2.5 log10(flux) does not hold (ptp c = {np.ptp(c):.2e})")
-    return float(np.median(c)) - 2.5 * np.log10(d.truth_flux + d.truth_trend), payload["mag"]
+        raise ValueError(
+            f"mag = c - 2.5 log10(flux) does not hold (ptp c = {np.ptp(c):.2e})"
+        )
+    return (
+        float(np.median(c)) - 2.5 * np.log10(d.truth_flux + d.truth_trend),
+        payload["mag"],
+    )
 
 
 def score_file(path: Path) -> list[dict]:
@@ -107,15 +118,27 @@ def score_file(path: Path) -> list[dict]:
     payload = load_tess_votable(path)
     t = absolute_jd_to_mjd(payload["t"])
     truth, mag = noise_free_mag(path, payload)
-    feats = extract_features(t, mag, payload["sig"], payload["period"], payload["epoch_jd"])
+    feats = extract_features(
+        t, mag, payload["sig"], payload["period"], payload["epoch_jd"]
+    )
     lib = build_library(feats)
     t0 = time.time()
     res = select_model(
-        t, mag, payload["sig"], payload["period"], payload["epoch_jd"],
-        features=feats, candidates=lib, data_id=path.stem,
+        t,
+        mag,
+        payload["sig"],
+        payload["period"],
+        payload["epoch_jd"],
+        features=feats,
+        candidates=lib,
+        data_id=path.stem,
     )
     seconds = time.time() - t0
-    key = lambda c: (c.config.model.harmonics, c.config.data.baseline_order, c.config.model.ocon)  # noqa: E731
+    key = lambda c: (
+        c.config.model.harmonics,
+        c.config.data.baseline_order,
+        c.config.model.ocon,
+    )  # noqa: E731
     proposed = {key(c) for c in propose_candidates(feats)}
     library_key = {c.name: key(c) for c in lib}
     noise = 1e3 * float(np.std(mag - truth))
@@ -219,7 +242,7 @@ def main() -> None:
     for m in manifest:
         if filters and not any(f in m["path"] for f in filters):
             continue
-        path = results.parent / m["path"]
+        path = GENERATOR / m["path"]
         logger.info("Scoring %s", path.name)
         try:
             rows += score_file(path)

@@ -1,19 +1,26 @@
 """Offset against spot longitude for the nine 120 s curves.
 
 Two panels, primary and secondary. Each panel shows the bisector median of the
-pure curve, the Mikulášek time, and the WSAP time. All three are seconds from
-conjunction. Positive means later than conjunction. The centroid is not drawn.
-WSL is not read. The numbers come from tables already written. Nothing is refitted.
+pure curve, the Mikulášek time, the AP time and the WSAP time. All four are
+seconds from conjunction. Positive means later than conjunction. The centroid
+is not drawn. WSL is not read. The numbers come from tables already written.
+Nothing is refitted. AP and WSAP use the centre ± 0.0176 cycles on the primary
+and ± 0.0178 cycles on the secondary. Mikulášek uses the centre ± 0.12 cycles.
 
 Run from the repository root::
 
     MPLBACKEND=Agg python examples/spot_120_offset_figure.py
+    MPLBACKEND=Agg python examples/spot_120_offset_figure.py --set m11
 
-The figure is ``results/synthetic_scoring/spot_120_select/offset_vs_longitude.png``.
+``--set n01`` (the default) reads the 1 percent timings and writes
+``results/synthetic_scoring/spot_120_select/offset_vs_longitude.png``.
+``--set m11`` reads the Tmag 11 timings and writes the same names under
+``results/synthetic_scoring/spot_120_select_m11/``.
 """
 
 from __future__ import annotations
 
+import argparse
 import csv
 import logging
 import sys
@@ -31,14 +38,28 @@ logger = logging.getLogger(__name__)
 DAY = 86400.0
 ROOT = Path(__file__).resolve().parents[1]
 PURE = ROOT / "results" / "synthetic_scoring" / "spot_pure" / "pure_minima.csv"
-TIMING = (
-    ROOT / "results" / "synthetic_scoring" / "spot_120_select" / "timing_120_w0.12.csv"
-)
-WSAP = Path(
-    "/home/voz/projects/UPJS/Mavka_user_folder/output/detached_120/tables/WSAP.csv"
-)
-CURVES = Path("/home/voz/projects/UPJS/EB_synthetic_lc/results/detached")
-OUT = ROOT / "results" / "synthetic_scoring" / "spot_120_select"
+HALF_PHASE = {"primary": 0.0176, "secondary": 0.0178}
+GENERATOR = Path("/home/voz/projects/UPJS/EB_synthetic_lc")
+MAVKA_ROOT = Path("/home/voz/projects/UPJS/Mavka_user_folder/output")
+SETS = {
+    "n01": (
+        ROOT / "results" / "synthetic_scoring" / "spot_120_select",
+        MAVKA_ROOT / "detached_120" / "tables",
+        GENERATOR / "results" / "n01" / "detached",
+        "1 percent of the flux",
+    ),
+    "m11": (
+        ROOT / "results" / "synthetic_scoring" / "spot_120_select_m11",
+        MAVKA_ROOT / "detached_120_m11" / "tables",
+        GENERATOR / "results" / "m11" / "detached",
+        "Tmag 11 (2.6 mmag at 120 s)",
+    ),
+}
+TIMING = SETS["n01"][0] / "timing_120_w0.12.csv"
+MAVKA = SETS["n01"][1]
+CURVES = SETS["n01"][2]
+NOISE = SETS["n01"][3]
+OUT = SETS["n01"][0]
 ORDER = (
     "SP_none",
     "SP_L000",
@@ -109,27 +130,34 @@ def physics_of(filename: str) -> str:
     return found[0]
 
 
-def wsap_offsets() -> dict[tuple[str, str], dict]:
-    """Mean WSAP time minus conjunction, per system and eclipse kind.
+def method_offsets(method: str) -> dict[tuple[str, str], dict]:
+    """Mean time minus conjunction for one MAVKA method.
 
     ``time_d`` and ``eclipse_T_conj_days`` are both days on the file clock.
-    A row is used only when its status is ``accepted``. WSL is not read.
+    A row is used only when its status is ``accepted``. The half-width on each
+    row must be the expert value for that eclipse kind. WSL is not read.
+
+    Args:
+        method (str): ``AP`` or ``WSAP``.
 
     Returns:
         dict: ``(physics, kind)`` to the mean offset in seconds, the scatter,
-        and the number of eclipses.
+        and the number of eclipses. Keys are prefixed with the method name
+        in lower case.
 
     Raises:
-        RuntimeError: If the table is not WSAP, a time is empty, or a window
-        centre is not the conjunction of that eclipse.
+        RuntimeError: If the table is the wrong method, a window is not the
+        expert half-width, a time is empty, or a window centre is not the
+        conjunction of that eclipse.
     """
     grouped: dict[str, list[dict]] = {}
-    for row in read_rows(WSAP):
-        if row["method"] != "WSAP":
-            raise RuntimeError(f"expected WSAP, found {row['method']}")
+    for row in read_rows(MAVKA / f"{method}.csv"):
+        if row["method"] != method:
+            raise RuntimeError(f"expected {method}, found {row['method']}")
         grouped.setdefault(row["file"], []).append(row)
     if set(map(physics_of, grouped)) != set(ORDER):
-        raise RuntimeError(f"WSAP files are {sorted(map(physics_of, grouped))}")
+        raise RuntimeError(f"{method} files are {sorted(map(physics_of, grouped))}")
+    prefix = method.lower()
     out = {}
     for filename, group in grouped.items():
         physics = physics_of(filename)
@@ -142,7 +170,13 @@ def wsap_offsets() -> dict[tuple[str, str], dict]:
                 r for r in group if r["kind"] == kind and r["status"] == "accepted"
             ]
             if not accepted or any(r["time_d"] == "" for r in accepted):
-                raise RuntimeError(f"{physics} {kind} has no accepted WSAP time")
+                raise RuntimeError(f"{physics} {kind} has no accepted {method} time")
+            windows = {float(r["half_phase_window"]) for r in accepted}
+            if windows != {HALF_PHASE[kind]}:
+                raise RuntimeError(
+                    f"{physics} {kind} {method} half-width is {windows}, "
+                    f"expected {HALF_PHASE[kind]}"
+                )
             conj = tconj[np.array([k == kind for k in kinds])]
             measured = np.array([float(r["time_d"]) for r in accepted])
             predicted = np.array([float(r["t_pred_d"]) for r in accepted])
@@ -154,16 +188,17 @@ def wsap_offsets() -> dict[tuple[str, str], dict]:
             delta = measured - conj[nearest]
             if np.any(np.abs(delta) > period / 4):
                 raise RuntimeError(
-                    f"{physics} {kind}: a WSAP time is far from conjunction"
+                    f"{physics} {kind}: a {method} time is far from conjunction"
                 )
             seconds = delta * DAY
-            out[(physics, kind)] = dict(
-                wsap_minus_conj_s=float(np.mean(seconds)),
-                wsap_scatter_s=float(np.std(seconds)),
-                wsap_n=int(len(seconds)),
-            )
+            out[(physics, kind)] = {
+                f"{prefix}_minus_conj_s": float(np.mean(seconds)),
+                f"{prefix}_scatter_s": float(np.std(seconds)),
+                f"{prefix}_n": int(len(seconds)),
+            }
             logger.info(
-                "WSAP %s %s n=%d vs conj %+.2f s",
+                "%s %s %s n=%d vs conj %+.2f s",
+                method,
                 physics,
                 kind,
                 len(seconds),
@@ -173,14 +208,15 @@ def wsap_offsets() -> dict[tuple[str, str], dict]:
 
 
 def series() -> list[dict]:
-    """Join the bisector median, the Mikulášek offset and the WSAP offset.
+    """Join the bisector median, the Mikulášek offset, AP and WSAP.
 
     Returns:
         list[dict]: One row per system and eclipse, with the plotted values.
     """
     pure = read_rows(PURE)
     timing = read_rows(TIMING)
-    wsap = wsap_offsets()
+    ap = method_offsets("AP")
+    wsap = method_offsets("WSAP")
     rows = []
     for physics in ORDER:
         for kind in ("primary", "secondary"):
@@ -199,6 +235,7 @@ def series() -> list[dict]:
                     ),
                     mikulasek_minus_conj_s=float(fit["bias_vs_conj_s"]),
                     mikulasek_scatter_s=float(fit["scatter_vs_pure_s"]),
+                    **ap[(physics, kind)],
                     **wsap[(physics, kind)],
                 )
             )
@@ -212,7 +249,7 @@ def draw(rows: list[dict], path: Path) -> None:
         rows (list[dict]): Plotted values from ``series``.
         path (Path): PNG to write.
     """
-    fig, axes = plt.subplots(1, 2, figsize=(12, 5), sharey=True)
+    fig, axes = plt.subplots(1, 2, figsize=(12, 5.6), sharey=True)
     x = list(range(len(ORDER)))
     for ax, kind in zip(axes, ("primary", "secondary")):
         part = [r for r in rows if r["kind"] == kind]
@@ -235,6 +272,15 @@ def draw(rows: list[dict], path: Path) -> None:
         )
         ax.errorbar(
             x,
+            [r["ap_minus_conj_s"] for r in part],
+            yerr=[r["ap_scatter_s"] for r in part],
+            fmt="D-",
+            color="#6b3fa0",
+            capsize=3,
+            label="AP",
+        )
+        ax.errorbar(
+            x,
             [r["wsap_minus_conj_s"] for r in part],
             yerr=[r["wsap_scatter_s"] for r in part],
             fmt="^-",
@@ -248,8 +294,10 @@ def draw(rows: list[dict], path: Path) -> None:
     axes[0].set_ylabel("Offset from conjunction (s)")
     axes[0].legend()
     fig.suptitle(
-        "120 s. Positive means later than conjunction. The bar is the eclipse scatter. "
-        "WSAP full phase width 0.058."
+        f"120 s, {NOISE}. Positive means later than conjunction. "
+        "The bar is the eclipse scatter.\n"
+        "Window is the centre ± half-width. AP and WSAP: primary ± 0.0176, "
+        "secondary ± 0.0178 cycles. Mikulášek: ± 0.12 cycles (full width 0.24)."
     )
     fig.tight_layout()
     fig.savefig(path, dpi=150)
@@ -258,7 +306,19 @@ def draw(rows: list[dict], path: Path) -> None:
 
 def main() -> None:
     """Read the two tables and write the longitude figure."""
+    global TIMING, MAVKA, CURVES, NOISE, OUT
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--set",
+        choices=tuple(SETS),
+        default="n01",
+        help="n01 is the 1 percent set. m11 is the Tmag 11 set.",
+    )
+    args = parser.parse_args()
+    OUT, MAVKA, CURVES, NOISE = SETS[args.set]
+    TIMING = OUT / "timing_120_w0.12.csv"
+    logger.info("noise set %s, curves %s, mavka %s", args.set, CURVES, MAVKA)
     OUT.mkdir(parents=True, exist_ok=True)
     (OUT / "offset_command.txt").write_text(" ".join(sys.argv) + "\n")
     rows = series()

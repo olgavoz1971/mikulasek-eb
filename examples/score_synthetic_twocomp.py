@@ -19,7 +19,13 @@ import logging
 import sys
 
 import numpy as np
-from score_synthetic_fits import DEFAULT_RESULTS, OUT, build_library, noise_free_mag
+from score_synthetic_fits import (
+    GENERATOR,
+    DEFAULT_RESULTS,
+    OUT,
+    build_library,
+    noise_free_mag,
+)
 
 from mikulasek_eb import select_model
 from mikulasek_eb.candidates import Candidate
@@ -44,26 +50,70 @@ def score_file(path) -> list[dict]:
     payload = load_tess_votable(path)
     t = absolute_jd_to_mjd(payload["t"])
     truth, mag = noise_free_mag(path, payload)
-    feats = extract_features(t, mag, payload["sig"], payload["period"], payload["epoch_jd"])
+    feats = extract_features(
+        t, mag, payload["sig"], payload["period"], payload["epoch_jd"]
+    )
     cands = []
     for c in build_library(feats):
-        if c.config.data.baseline_order != 1 or c.config.model.harmonics not in HARMONICS:
+        if (
+            c.config.data.baseline_order != 1
+            or c.config.model.harmonics not in HARMONICS
+        ):
             continue
         pol = c.config.policy
         single = dataclasses.replace(pol, allow_two_component=False)
-        two = dataclasses.replace(pol, allow_two_component=True, force_two_component=True)
-        cands.append(Candidate(c.name + "_single", dataclasses.replace(c.config, policy=single).validate(), ()))
-        cands.append(Candidate(c.name + "_two", dataclasses.replace(c.config, policy=two).validate(), ()))
-    res = select_model(t, mag, payload["sig"], payload["period"], payload["epoch_jd"], features=feats, candidates=cands, data_id=path.stem)
+        two = dataclasses.replace(
+            pol, allow_two_component=True, force_two_component=True
+        )
+        cands.append(
+            Candidate(
+                c.name + "_single",
+                dataclasses.replace(c.config, policy=single).validate(),
+                (),
+            )
+        )
+        cands.append(
+            Candidate(
+                c.name + "_two",
+                dataclasses.replace(c.config, policy=two).validate(),
+                (),
+            )
+        )
+    res = select_model(
+        t,
+        mag,
+        payload["sig"],
+        payload["period"],
+        payload["epoch_jd"],
+        features=feats,
+        candidates=cands,
+        data_id=path.stem,
+    )
     rows = []
     for row in res.table:
         out = res.fits.get(row.name)
         rms_truth = adopted = None
         if out is not None:
             idx = np.searchsorted(t, out.t_mjd)
-            rms_truth = 1e3 * float(np.sqrt(np.mean((out.mag - out.pipeline.adopted.resid - truth[idx]) ** 2)))
+            rms_truth = 1e3 * float(
+                np.sqrt(
+                    np.mean((out.mag - out.pipeline.adopted.resid - truth[idx]) ** 2)
+                )
+            )
             adopted = bool(out.solution.stats["two_component"])
-        rows.append(dict(file=path.name, candidate=row.name, status=row.status, k=row.k, bic=row.bic, delta_bic=row.delta_bic, rms_truth=rms_truth, two_adopted=adopted, chosen=bool(res.best and res.best.name == row.name)))
+        rows.append(
+            dict(
+                file=path.name,
+                candidate=row.name,
+                status=row.status,
+                k=row.k,
+                bic=row.bic,
+                delta_bic=row.delta_bic,
+                rms_truth=rms_truth,
+                two_adopted=adopted,
+                chosen=bool(res.best and res.best.name == row.name),
+            )
+        )
     return rows
 
 
@@ -77,7 +127,7 @@ def main() -> None:
     for m in manifest:
         if not any(f in m["path"] for f in filters):
             continue
-        path = DEFAULT_RESULTS.parent / m["path"]
+        path = GENERATOR / m["path"]
         logger.warning("Scoring %s", path.name)
         try:
             rows += score_file(path)
@@ -88,11 +138,17 @@ def main() -> None:
         w = csv.DictWriter(fh, fieldnames=list(rows[0]))
         w.writeheader()
         w.writerows(rows)
-    lines = ["| File | BIC winner | two adopted | rms truth winner | best single (rms) | best two-adopted (rms) | dBIC best two vs best single |", "|---|---|---|---|---|---|---|"]
+    lines = [
+        "| File | BIC winner | two adopted | rms truth winner | best single (rms) | best two-adopted (rms) | dBIC best two vs best single |",
+        "|---|---|---|---|---|---|---|",
+    ]
     for name in dict.fromkeys(r["file"] for r in rows):
         fr = [r for r in rows if r["file"] == name and r["bic"] is not None]
         win = next(r for r in fr if r["chosen"])
-        sg = min((r for r in fr if r["candidate"].endswith("_single")), key=lambda r: r["bic"])
+        sg = min(
+            (r for r in fr if r["candidate"].endswith("_single")),
+            key=lambda r: r["bic"],
+        )
         tw = [r for r in fr if r["candidate"].endswith("_two")]
         twb = min(tw, key=lambda r: r["bic"]) if tw else None
         sg_t = min((r["rms_truth"] for r in fr if r["candidate"].endswith("_single")))

@@ -31,8 +31,13 @@ from mikulasek_eb.synthetic_check import _array, _num, load_synthetic
 logger = logging.getLogger(__name__)
 DAY = 86400.0
 GENERATED = Path("/home/voz/projects/UPJS/EB_synthetic_lc")
-MANIFEST = GENERATED / "results" / "manifest_spotsweep.csv"
-OUT = Path(__file__).resolve().parents[1] / "results" / "synthetic_scoring" / "spot_degraded"
+MANIFEST = GENERATED / "results" / "n01" / "manifest_spotsweep.csv"
+OUT = (
+    Path(__file__).resolve().parents[1]
+    / "results"
+    / "synthetic_scoring"
+    / "spot_degraded"
+)
 
 
 def injected_trend_mag(pure_flux: np.ndarray, trend_flux: np.ndarray) -> np.ndarray:
@@ -63,10 +68,16 @@ def rows_for(cadence: int) -> list[dict]:
         list[dict]: Accepted rows.
     """
     with open(MANIFEST, newline="") as fh:
-        return [r for r in csv.DictReader(fh) if int(r["cadence_s"]) == cadence and int(r["fail"]) == 0]
+        return [
+            r
+            for r in csv.DictReader(fh)
+            if int(r["cadence_s"]) == cadence and int(r["fail"]) == 0
+        ]
 
 
-def structure_from_spot_free(window: float, harmonics: tuple[int, ...] | None = None) -> Config:
+def structure_from_spot_free(
+    window: float, harmonics: tuple[int, ...] | None = None
+) -> Config:
     """Model structure chosen on the spot-free 120 s curve, with the O'Connell term on.
 
     Args:
@@ -83,7 +94,12 @@ def structure_from_spot_free(window: float, harmonics: tuple[int, ...] | None = 
     payload = load_tess_votable(path)
     t = absolute_jd_to_mjd(payload["t"])
     res = select_model(
-        t, payload["mag"], payload["sig"], payload["period"], payload["epoch_jd"], data_id=path.stem
+        t,
+        payload["mag"],
+        payload["sig"],
+        payload["period"],
+        payload["epoch_jd"],
+        data_id=path.stem,
     )
     if res.best is None:
         raise RuntimeError("no model chosen for the spot-free curve")
@@ -91,7 +107,9 @@ def structure_from_spot_free(window: float, harmonics: tuple[int, ...] | None = 
     logger.info("spot-free selection %s; O'Connell forced on", res.best.name)
     model = dataclasses.replace(cfg.model, ocon=True)
     if harmonics is not None:
-        logger.warning("harmonics replaced by %s (selected %s)", harmonics, cfg.model.harmonics)
+        logger.warning(
+            "harmonics replaced by %s (selected %s)", harmonics, cfg.model.harmonics
+        )
         model = dataclasses.replace(model, harmonics=harmonics)
     return dataclasses.replace(
         cfg,
@@ -114,17 +132,33 @@ def time_file(path: Path, structure: Config, out_dir: Path) -> list[dict]:
     payload = load_tess_votable(path)
     synthetic = load_synthetic(path)
     t = absolute_jd_to_mjd(payload["t"])
-    features = extract_features(t, payload["mag"], payload["sig"], payload["period"], payload["epoch_jd"])
+    features = extract_features(
+        t, payload["mag"], payload["sig"], payload["period"], payload["epoch_jd"]
+    )
     own = propose_candidates(features)[0].config.data
     data = dataclasses.replace(own, baseline_order=structure.data.baseline_order)
     config = dataclasses.replace(structure, data=data).validate()
-    out = fit(t, payload["mag"], payload["sig"], payload["period"], payload["epoch_jd"], config, data_id=path.stem)
+    out = fit(
+        t,
+        payload["mag"],
+        payload["sig"],
+        payload["period"],
+        payload["epoch_jd"],
+        config,
+        data_id=path.stem,
+    )
     adopted = out.pipeline.adopted
     single = out.pipeline.single_component
     model = out.solution.build_model()
     yhat, template, theta = predicted_magnitude(
-        out.t_mjd, out.mag, out.sig, model, adopted.p, adopted.ephem,
-        out.pipeline.seg, config.data.baseline_order,
+        out.t_mjd,
+        out.mag,
+        out.sig,
+        model,
+        adopted.p,
+        adopted.ephem,
+        out.pipeline.seg,
+        config.data.baseline_order,
     )
     injected = None
     if synthetic.truth_flux is not None and synthetic.truth_trend is not None:
@@ -134,12 +168,26 @@ def time_file(path: Path, structure: Config, out_dir: Path) -> list[dict]:
     trends.mkdir(parents=True, exist_ok=True)
     fits.mkdir(parents=True, exist_ok=True)
     plot_instrumental_trend(
-        out.t_mjd, out.mag, yhat, template, trends / f"{path.stem}.png", path.stem, injected_mag=injected
+        out.t_mjd,
+        out.mag,
+        yhat,
+        template,
+        trends / f"{path.stem}.png",
+        path.stem,
+        injected_mag=injected,
     )
     rms = 1e3 * float(out.solution.stats["rms_mag"])
     plot_global_fit(
-        mjd_to_jd(out.t_mjd), out.mag, out.sig, yhat, template, theta, model,
-        single.p, adopted.p, out.pipeline.seg,
+        mjd_to_jd(out.t_mjd),
+        out.mag,
+        out.sig,
+        yhat,
+        template,
+        theta,
+        model,
+        single.p,
+        adopted.p,
+        out.pipeline.seg,
         f"{path.stem}  rms {rms:.2f} mmag",
         timescale=payload.get("timescale"),
         save_path=str(fits / f"{path.stem}.png"),
@@ -150,13 +198,20 @@ def time_file(path: Path, structure: Config, out_dir: Path) -> list[dict]:
     if status != "ok":
         logger.error(
             "%s fit status %s, not timed: %s",
-            path.stem, status, "; ".join(out.solution.stats["status_reasons"]),
+            path.stem,
+            status,
+            "; ".join(out.solution.stats["status_reasons"]),
         )
         return [
             dict(
-                file=path.name, physics=meta.get("physics_id"),
-                cadence_s=int(_num(meta, "cadence_s")), kind=kind, n=0,
-                n_rejected=0, window=config.timing.window, status=status,
+                file=path.name,
+                physics=meta.get("physics_id"),
+                cadence_s=int(_num(meta, "cadence_s")),
+                kind=kind,
+                n=0,
+                n_rejected=0,
+                window=config.timing.window,
+                status=status,
             )
             for kind in ("primary", "secondary")
         ]
@@ -174,9 +229,14 @@ def time_file(path: Path, structure: Config, out_dir: Path) -> list[dict]:
         pure = origin + tmin[mask]
         conj = origin + tconj[mask]
         base = dict(
-            file=path.name, physics=meta.get("physics_id"), cadence_s=int(_num(meta, "cadence_s")),
-            kind=kind, n=0, n_rejected=len(timings.rejected[kind]),
-            window=config.timing.window, status=status,
+            file=path.name,
+            physics=meta.get("physics_id"),
+            cadence_s=int(_num(meta, "cadence_s")),
+            kind=kind,
+            n=0,
+            n_rejected=len(timings.rejected[kind]),
+            window=config.timing.window,
+            status=status,
         )
         if len(measured) == 0 or len(pure) == 0:
             rows.append(base)
@@ -197,7 +257,11 @@ def time_file(path: Path, structure: Config, out_dir: Path) -> list[dict]:
         rows.append(base)
         logger.info(
             "%s %s n=%d bias vs conj %+.1f s, vs pure %+.1f s",
-            path.stem, kind, base["n"], base["bias_vs_conj_s"], base["bias_vs_pure_s"],
+            path.stem,
+            kind,
+            base["n"],
+            base["bias_vs_conj_s"],
+            base["bias_vs_pure_s"],
         )
     return rows
 
@@ -206,10 +270,31 @@ def main() -> None:
     """Time the requested cadences and write the table and both pictures per file."""
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     parser = argparse.ArgumentParser()
-    parser.add_argument("--cadence", type=int, nargs="+", required=True, help="Cadence in seconds, one or more of 120 600 1800.")
-    parser.add_argument("--window", type=float, default=0.12, help="Timing half-width in cycles. Default 0.12.")
-    parser.add_argument("--harmonics", type=int, nargs="+", default=None, help="Replace the selected cosine orders, e.g. 1 2. Needs --arm.")
-    parser.add_argument("--arm", default=None, help="Sub-folder of the output for a run that departs from the default structure.")
+    parser.add_argument(
+        "--cadence",
+        type=int,
+        nargs="+",
+        required=True,
+        help="Cadence in seconds, one or more of 120 600 1800.",
+    )
+    parser.add_argument(
+        "--window",
+        type=float,
+        default=0.12,
+        help="Timing half-width in cycles. Default 0.12.",
+    )
+    parser.add_argument(
+        "--harmonics",
+        type=int,
+        nargs="+",
+        default=None,
+        help="Replace the selected cosine orders, e.g. 1 2. Needs --arm.",
+    )
+    parser.add_argument(
+        "--arm",
+        default=None,
+        help="Sub-folder of the output for a run that departs from the default structure.",
+    )
     args = parser.parse_args()
     if args.harmonics is not None and not args.arm:
         parser.error("--harmonics changes the structure; give it its own --arm folder")
@@ -218,21 +303,38 @@ def main() -> None:
     (out_dir / "command.txt").write_text(" ".join(sys.argv) + "\n")
     harmonics = tuple(args.harmonics) if args.harmonics is not None else None
     structure = structure_from_spot_free(args.window, harmonics)
-    (out_dir / "model.txt").write_text(repr(structure.model) + "\n" + repr(structure.timing) + "\n")
+    (out_dir / "model.txt").write_text(
+        repr(structure.model) + "\n" + repr(structure.timing) + "\n"
+    )
     rows = []
     for cadence in args.cadence:
         for row in rows_for(cadence):
             rows.extend(time_file(GENERATED / row["path"], structure, out_dir))
     fields = [
-        "file", "physics", "cadence_s", "status", "kind", "n", "n_rejected", "window",
-        "bias_vs_conj_s", "bias_vs_pure_s", "scatter_vs_pure_s", "median_sigma_s", "honesty_vs_pure",
+        "file",
+        "physics",
+        "cadence_s",
+        "status",
+        "kind",
+        "n",
+        "n_rejected",
+        "window",
+        "bias_vs_conj_s",
+        "bias_vs_pure_s",
+        "scatter_vs_pure_s",
+        "median_sigma_s",
+        "honesty_vs_pure",
     ]
-    destination = out_dir / ("timing_" + "_".join(str(c) for c in args.cadence) + f"_w{args.window}.csv")
+    destination = out_dir / (
+        "timing_" + "_".join(str(c) for c in args.cadence) + f"_w{args.window}.csv"
+    )
     with open(destination, "w", newline="") as fh:
         writer = csv.DictWriter(fh, fields, extrasaction="ignore")
         writer.writeheader()
         writer.writerows(rows)
-    logger.info("wrote %s, %s and %s", destination, out_dir / "trends", out_dir / "fits")
+    logger.info(
+        "wrote %s, %s and %s", destination, out_dir / "trends", out_dir / "fits"
+    )
 
 
 if __name__ == "__main__":

@@ -220,7 +220,7 @@ def test_unreadable_file_is_reported(tmp_path):
     assert findings and findings[0].status == FAIL
 
 
-REAL = Path("/home/voz/projects/UPJS/EB_synthetic_lc/results/contact")
+REAL = Path("/home/voz/projects/UPJS/EB_synthetic_lc/results/n01/contact")
 REAL_FILE = REAL / "contact_overcontact_nooconnell_G5_S05_c600.vot"
 
 

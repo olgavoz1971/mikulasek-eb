@@ -24,7 +24,12 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
-from score_synthetic_fits import DEFAULT_RESULTS, OUT, build_library  # noqa: E402
+from score_synthetic_fits import (
+    GENERATOR,
+    DEFAULT_RESULTS,
+    OUT,
+    build_library,
+)  # noqa: E402
 
 from mikulasek_eb import fit  # noqa: E402
 from mikulasek_eb.config import ModelSpec  # noqa: E402
@@ -73,26 +78,40 @@ def zone_rms(ph_c, err, half):
         "secondary core": d2 < half,
         "secondary wings": (d2 >= half) & (d2 < 2.5 * half),
     }
-    zones["out of eclipse"] = ~(zones["primary core"] | zones["primary wings"] | zones["secondary core"] | zones["secondary wings"])
-    return {k: 1e3 * float(np.sqrt(np.mean(err[m] ** 2))) for k, m in zones.items() if m.any()}
+    zones["out of eclipse"] = ~(
+        zones["primary core"]
+        | zones["primary wings"]
+        | zones["secondary core"]
+        | zones["secondary wings"]
+    )
+    return {
+        k: 1e3 * float(np.sqrt(np.mean(err[m] ** 2)))
+        for k, m in zones.items()
+        if m.any()
+    }
 
 
 def main() -> None:
     """Fit the variants and write pictures and a zone table."""
-    logging.basicConfig(level=logging.INFO if "-v" in sys.argv else logging.WARNING, format="%(message)s")
+    logging.basicConfig(
+        level=logging.INFO if "-v" in sys.argv else logging.WARNING,
+        format="%(message)s",
+    )
     key = sys.argv[1]
     sys.argv = [a for a in sys.argv if a != "-v"] if False else sys.argv
     specs = [a for a in sys.argv[2:] if a != "-v"] or ["1:123:0", "3:123:0", "3:123:1"]
     with open(DEFAULT_RESULTS / "manifest.csv", newline="") as fh:
         rows = [r for r in csv.DictReader(fh) if key in r["path"]]
-    path = DEFAULT_RESULTS.parent / rows[0]["path"]
+    path = GENERATOR / rows[0]["path"]
     d = load_synthetic(path)
     payload = load_tess_votable(path)
     c = float(np.median(payload["mag"] + 2.5 * np.log10(d.flux)))
     mag = c - 2.5 * np.log10(d.flux - d.truth_trend)
     truth = c - 2.5 * np.log10(d.truth_flux)
     t = absolute_jd_to_mjd(payload["t"])
-    feats = extract_features(t, mag, payload["sig"], payload["period"], payload["epoch_jd"])
+    feats = extract_features(
+        t, mag, payload["sig"], payload["period"], payload["epoch_jd"]
+    )
     base = next(x for x in build_library(feats) if x.config.data.baseline_order == 0)
     PICTURES.mkdir(parents=True, exist_ok=True)
     half = 0.5 * max(feats.geometry["fwhm1"] or 0.03, feats.geometry["fwhm2"] or 0.03)
@@ -100,12 +119,26 @@ def main() -> None:
     fig, axes = plt.subplots(3, len(specs), figsize=(6 * len(specs), 11), squeeze=False)
     for j, spec in enumerate(specs):
         prof, harm, oc, *force = spec.split(":")
-        model = ModelSpec(profile=int(prof), harmonics=tuple(int(h) for h in harm), ocon=oc == "1")
+        model = ModelSpec(
+            profile=int(prof), harmonics=tuple(int(h) for h in harm), ocon=oc == "1"
+        )
         policy = base.config.policy
         if force and force[0] == "2":  # force the two-component trial
-            policy = dataclasses.replace(policy, rms_noise_two_comp_threshold=0.0, two_comp_min_rms_gain_frac=0.01)
+            policy = dataclasses.replace(
+                policy,
+                rms_noise_two_comp_threshold=0.0,
+                two_comp_min_rms_gain_frac=0.01,
+            )
         cfg = dataclasses.replace(base.config, model=model, policy=policy).validate()
-        out = fit(t, mag, payload["sig"], payload["period"], payload["epoch_jd"], cfg, data_id=path.stem)
+        out = fit(
+            t,
+            mag,
+            payload["sig"],
+            payload["period"],
+            payload["epoch_jd"],
+            cfg,
+            data_id=path.stem,
+        )
         idx = np.searchsorted(t, out.t_mjd)
         fit_mag = out.mag - out.pipeline.adopted.resid
         err = fit_mag - truth[idx]
@@ -136,19 +169,35 @@ def main() -> None:
             m = np.abs(((ph_c - centre + 0.5) % 1.0) - 0.5) < 3 * half
             x = ((ph_c[m] - centre + 0.5) % 1.0) - 0.5
             o = np.argsort(x)
-            ax.plot(x[o], 1e3 * err[m][o], ".", ms=2, color=col, label="primary" if centre == 0 else "secondary")
+            ax.plot(
+                x[o],
+                1e3 * err[m][o],
+                ".",
+                ms=2,
+                color=col,
+                label="primary" if centre == 0 else "secondary",
+            )
         ax.axhline(0, color="k", lw=0.5)
         ax.set_title("error zoomed on the eclipses (mmag)")
         ax.set_xlabel("phase from eclipse centre")
         ax.legend(fontsize=8)
     fig.suptitle(path.name)
     fig.tight_layout()
-    png = PICTURES / f"{path.stem}_profiles{'_' + '_'.join(s.replace(':', '') for s in specs) if sys.argv[2:] else ''}.png"
+    png = (
+        PICTURES
+        / f"{path.stem}_profiles{'_' + '_'.join(s.replace(':', '') for s in specs) if sys.argv[2:] else ''}.png"
+    )
     fig.savefig(png, dpi=110)
-    lines = [f"File {path.name}, eclipse core half-width {half:.4f} phase", "",
-             "| variant | two-comp | " + " | ".join(results[0][1]) + " |", "|---|---|" + "---|" * len(results[0][1])]
+    lines = [
+        f"File {path.name}, eclipse core half-width {half:.4f} phase",
+        "",
+        "| variant | two-comp | " + " | ".join(results[0][1]) + " |",
+        "|---|---|" + "---|" * len(results[0][1]),
+    ]
     for spec, z, two in results:
-        lines.append(f"| {spec} | {two} | " + " | ".join(f"{v:.2f}" for v in z.values()) + " |")
+        lines.append(
+            f"| {spec} | {two} | " + " | ".join(f"{v:.2f}" for v in z.values()) + " |"
+        )
     (PICTURES / f"{path.stem}_zones.md").write_text("\n".join(lines) + "\n")
     print("\n".join(lines))
     print(png)

@@ -2,26 +2,31 @@
 
 The harmonic orders, the O'Connell term and the baseline are chosen on that file.
 The solver, the verdict and the second-component gates are the package defaults.
-No extra weight is put on the minima. The timing half-width is 0.12 cycles, the
-window of this experiment. Every fitted candidate keeps its profile figure and its
+No extra weight is put on the minima. The timing window is the centre ± 0.12
+cycles (full width 0.24), the window of this experiment. Every fitted candidate keeps its profile figure and its
 trend figure. Only the chosen candidate is timed, and only when its verdict is ok.
 
 Run from the repository root::
 
     MPLBACKEND=Agg python examples/spot_120_select.py
+    MPLBACKEND=Agg python examples/spot_120_select.py --set m11
 
-Figures go to ``results/synthetic_scoring/spot_120_select/fits/`` and ``trends/``.
-The timing table is ``timing_120_w0.12.csv`` in that directory.
+``--set n01`` (the default) reads the 1 percent files and writes
+``results/synthetic_scoring/spot_120_select/``. ``--set m11`` reads the Tmag 11
+files and writes ``results/synthetic_scoring/spot_120_select_m11/``. Each
+directory holds ``fits/``, ``trends/`` and ``timing_120_w0.12.csv``.
 """
 
 from __future__ import annotations
 
+import argparse
 import csv
 import logging
 import sys
 from pathlib import Path
 
 import numpy as np
+from volightcurve import JD_TO_MJD
 
 import mikulasek_eb as eb
 from mikulasek_eb.helpers import predicted_magnitude
@@ -32,13 +37,13 @@ logger = logging.getLogger(__name__)
 DAY = 86400.0
 WINDOW = 0.12
 GENERATED = Path("/home/voz/projects/UPJS/EB_synthetic_lc")
-MANIFEST = GENERATED / "results" / "manifest_spotsweep.csv"
-OUT = (
-    Path(__file__).resolve().parents[1]
-    / "results"
-    / "synthetic_scoring"
-    / "spot_120_select"
-)
+SCORING = Path(__file__).resolve().parents[1] / "results" / "synthetic_scoring"
+SETS = {
+    "n01": ("results/n01/manifest_spotsweep.csv", "spot_120_select"),
+    "m11": ("results/m11/manifest_spotsweep.csv", "spot_120_select_m11"),
+}
+MANIFEST = GENERATED / SETS["n01"][0]
+OUT = SCORING / SETS["n01"][1]
 
 
 def rows_120() -> list[dict]:
@@ -114,9 +119,7 @@ def save_figures(
         save_path=str(fits / f"{stem}.png"),
     )
     synthetic = load_synthetic(curve)
-    injected = None
-    if synthetic.truth_flux is not None and synthetic.truth_trend is not None:
-        injected = injected_trend_mag(synthetic.truth_flux, synthetic.truth_trend)
+    injected = injected_on_kept_points(synthetic, out.t_mjd)
     plot_instrumental_trend(
         out.t_mjd,
         out.mag,
@@ -127,6 +130,36 @@ def save_figures(
         injected_mag=injected,
     )
     logger.info("figures %s", stem)
+
+
+def injected_on_kept_points(synthetic, t_mjd: np.ndarray) -> np.ndarray | None:
+    """Injected trend in magnitudes at the times the fit kept.
+
+    The fit drops out-of-eclipse points beyond 5 sigma, so its time array is shorter
+    than the file. The trend is taken from the file rows whose MJD matches.
+
+    Args:
+        synthetic: Light curve as returned by ``load_synthetic``.
+        t_mjd (ndarray): Times the fit used (MJD).
+
+    Returns:
+        ndarray | None: Trend at those times, or None when the file has no truth trend.
+
+    Raises:
+        RuntimeError: If a fit time has no matching row in the file.
+    """
+    if synthetic.truth_flux is None or synthetic.truth_trend is None:
+        return None
+    injected = injected_trend_mag(synthetic.truth_flux, synthetic.truth_trend)
+    if len(injected) == len(t_mjd):
+        return injected
+    file_mjd = synthetic.time + float(synthetic.timesys["timeorigin"]) - JD_TO_MJD
+    if np.any(np.diff(file_mjd) <= 0):
+        raise RuntimeError("the file times are not strictly increasing")
+    pos = np.searchsorted(file_mjd, t_mjd)
+    if np.any(pos >= len(file_mjd)) or not np.allclose(file_mjd[pos], t_mjd, atol=1e-8):
+        raise RuntimeError("a fit time has no row in the light curve")
+    return injected[pos]
 
 
 def offsets(curve: Path, out: eb.FitOutput) -> list[dict]:
@@ -384,7 +417,20 @@ def write_table(path: Path, rows: list[dict], fields: list[str]) -> None:
 
 def main() -> None:
     """Fit and time the nine 120 s curves, and keep every candidate figure."""
+    global MANIFEST, OUT
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--set",
+        choices=tuple(SETS),
+        default="n01",
+        help="n01 is the 1 percent set. m11 is the Tmag 11 set.",
+    )
+    args = parser.parse_args()
+    manifest_rel, out_name = SETS[args.set]
+    MANIFEST = GENERATED / manifest_rel
+    OUT = SCORING / out_name
+    logger.info("noise set %s, manifest %s, output %s", args.set, MANIFEST, OUT)
     OUT.mkdir(parents=True, exist_ok=True)
     (OUT / "command.txt").write_text(" ".join(sys.argv) + "\n")
     manifest = rows_120()

@@ -18,7 +18,7 @@ import logging
 import sys
 
 import numpy as np
-from score_synthetic_fits import DEFAULT_RESULTS, OUT, build_library
+from score_synthetic_fits import GENERATOR, DEFAULT_RESULTS, OUT, build_library
 
 from mikulasek_eb import fit
 from mikulasek_eb.config import ModelSpec
@@ -47,7 +47,9 @@ def run_file(path) -> list[dict]:
     mag = c - 2.5 * np.log10(d.flux - d.truth_trend)
     truth = c - 2.5 * np.log10(d.truth_flux)
     t = absolute_jd_to_mjd(payload["t"])
-    feats = extract_features(t, mag, payload["sig"], payload["period"], payload["epoch_jd"])
+    feats = extract_features(
+        t, mag, payload["sig"], payload["period"], payload["epoch_jd"]
+    )
     base = [x for x in build_library(feats) if x.config.data.baseline_order == 0]
     rows = []
     for cand in base:
@@ -56,22 +58,48 @@ def run_file(path) -> list[dict]:
             continue
         for prof in PROFILES:
             cfg = dataclasses.replace(
-                cand.config, model=ModelSpec(profile=prof, harmonics=m.harmonics, ocon=m.ocon)
+                cand.config,
+                model=ModelSpec(profile=prof, harmonics=m.harmonics, ocon=m.ocon),
             ).validate()
-            row = dict(file=path.name, profile=prof, harmonics="".join(map(str, m.harmonics)),
-                       ocon=m.ocon, status="ok", rms_truth=None, rms_data=None,
-                       two_component=None)
+            row = dict(
+                file=path.name,
+                profile=prof,
+                harmonics="".join(map(str, m.harmonics)),
+                ocon=m.ocon,
+                status="ok",
+                rms_truth=None,
+                rms_data=None,
+                two_component=None,
+            )
             try:
-                out = fit(t, mag, payload["sig"], payload["period"], payload["epoch_jd"], cfg, data_id=path.stem)
+                out = fit(
+                    t,
+                    mag,
+                    payload["sig"],
+                    payload["period"],
+                    payload["epoch_jd"],
+                    cfg,
+                    data_id=path.stem,
+                )
                 idx = np.searchsorted(t, out.t_mjd)
                 resid = out.pipeline.adopted.resid
-                row["rms_truth"] = 1e3 * float(np.sqrt(np.mean((out.mag - resid - truth[idx]) ** 2)))
+                row["rms_truth"] = 1e3 * float(
+                    np.sqrt(np.mean((out.mag - resid - truth[idx]) ** 2))
+                )
                 row["rms_data"] = 1e3 * float(np.sqrt(np.mean(resid**2)))
                 row["two_component"] = bool(out.solution.stats["two_component"])
             except MikulasekError as exc:
                 row["status"] = f"{type(exc).__name__}"
             rows.append(row)
-            logger.warning("%s p%d h%s oc=%s %s %s", path.name[-14:], prof, row["harmonics"], m.ocon, row["status"], row["rms_truth"])
+            logger.warning(
+                "%s p%d h%s oc=%s %s %s",
+                path.name[-14:],
+                prof,
+                row["harmonics"],
+                m.ocon,
+                row["status"],
+                row["rms_truth"],
+            )
     return rows
 
 
@@ -85,7 +113,7 @@ def main() -> None:
     for m in manifest:
         if filters and not any(f in m["path"] for f in filters):
             continue
-        rows += run_file(DEFAULT_RESULTS.parent / m["path"])
+        rows += run_file(GENERATOR / m["path"])
     OUT.mkdir(parents=True, exist_ok=True)
     with open(OUT / "profiles_vs_truth.csv", "w", newline="") as fh:
         w = csv.DictWriter(fh, fieldnames=list(rows[0]))
@@ -93,7 +121,12 @@ def main() -> None:
         w.writerows(rows)
     lines = []
     for name in dict.fromkeys(r["file"] for r in rows):
-        lines += [f"### {name}", "", "| profile | best rms truth (mmag) | with | two-component | failed fits |", "|---|---|---|---|---|"]
+        lines += [
+            f"### {name}",
+            "",
+            "| profile | best rms truth (mmag) | with | two-component | failed fits |",
+            "|---|---|---|---|---|",
+        ]
         for p in PROFILES:
             fr = [r for r in rows if r["file"] == name and r["profile"] == p]
             ok = [r for r in fr if r["rms_truth"] is not None]
@@ -101,7 +134,9 @@ def main() -> None:
                 lines.append(f"| {p} | - | - | - | {len(fr)} |")
                 continue
             b = min(ok, key=lambda r: r["rms_truth"])
-            lines.append(f"| {p} | {b['rms_truth']:.3f} | h{b['harmonics']}{' oc' if b['ocon'] else ''} | {b['two_component']} | {len(fr) - len(ok)} |")
+            lines.append(
+                f"| {p} | {b['rms_truth']:.3f} | h{b['harmonics']}{' oc' if b['ocon'] else ''} | {b['two_component']} | {len(fr) - len(ok)} |"
+            )
         lines.append("")
     (OUT / "profiles_vs_truth.md").write_text("\n".join(lines))
 

@@ -33,8 +33,8 @@ GENERATED = Path("/home/voz/projects/UPJS/EB_synthetic_lc")
 HERE = Path(__file__).resolve().parent
 OUT = HERE / "out"
 FILES = (
-    "results/detached/detached_none_nooconnell_SP_L000_SP_L000_1800_c1800.vot",
-    "results/detached/detached_none_nooconnell_SP_L180_SP_L180_1800_c1800.vot",
+    "results/n01/detached/detached_none_nooconnell_SP_L000_SP_L000_1800_c1800.vot",
+    "results/n01/detached/detached_none_nooconnell_SP_L180_SP_L180_1800_c1800.vot",
 )
 # Wide intervals for this experiment, in magnitudes and in cycles. Gamma from 0.3
 # still includes the paper's cusp (Figure 1 draws 1/2) and excludes the needle.
@@ -188,18 +188,38 @@ def _one(path: Path, label: str) -> dict:
     t = absolute_jd_to_mjd(payload["t"])
     config = _config_for(path)
     out = fit(
-        t, payload["mag"], payload["sig"], payload["period"], payload["epoch_jd"], config, data_id=path.stem
+        t,
+        payload["mag"],
+        payload["sig"],
+        payload["period"],
+        payload["epoch_jd"],
+        config,
+        data_id=path.stem,
     )
     adopted = out.pipeline.adopted
     model = out.solution.build_model()
     yhat, template, theta = predicted_magnitude(
-        out.t_mjd, out.mag, out.sig, model, adopted.p, adopted.ephem,
-        out.pipeline.seg, config.data.baseline_order,
+        out.t_mjd,
+        out.mag,
+        out.sig,
+        model,
+        adopted.p,
+        adopted.ephem,
+        out.pipeline.seg,
+        config.data.baseline_order,
     )
     picture = OUT / f"{path.stem}_{label}.png"
     plot_global_fit(
-        mjd_to_jd(out.t_mjd), out.mag, out.sig, yhat, template, theta, model,
-        out.pipeline.single_component.p, adopted.p, out.pipeline.seg,
+        mjd_to_jd(out.t_mjd),
+        out.mag,
+        out.sig,
+        yhat,
+        template,
+        theta,
+        model,
+        out.pipeline.single_component.p,
+        adopted.p,
+        out.pipeline.seg,
         f"{path.stem} {label}  rms {1e3 * float(out.solution.stats['rms_mag']):.2f} mmag",
         timescale=payload.get("timescale"),
         save_path=str(picture),
@@ -219,8 +239,14 @@ def _one(path: Path, label: str) -> dict:
     )
     logger.info(
         "%s %s A1=%.4g G1=%.4g D1=%.4g rms=%.2f mmag held=%d outside=%s",
-        path.stem, label, row["A1"], row["G1"], row["D1"], row["rms_mmag"],
-        row["n_held"], row["outside"] or "none",
+        path.stem,
+        label,
+        row["A1"],
+        row["G1"],
+        row["D1"],
+        row["rms_mmag"],
+        row["n_held"],
+        row["outside"] or "none",
     )
     return row
 
