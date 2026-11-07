@@ -7,6 +7,7 @@ The new light curve keeps its own exposure, baseline and clipping settings (``Da
 
 Groups:
     ``shape``       D, Gamma, C, K of every eclipse and second component.
+    ``widths``      D alone of every eclipse and second component (Gamma, C, K stay).
     ``amplitudes``  A of every eclipse and second component.
     ``harmonics``   H<k> and the O'Connell term S1.
     ``zero_phase``  M0, the epoch of the primary minimum.
@@ -37,10 +38,11 @@ from .validity import amplitude_scale, assess_fit, shape_bounds
 
 logger = logging.getLogger(__name__)
 
-GROUPS = ("shape", "amplitudes", "harmonics", "zero_phase", "period")
+GROUPS = ("shape", "widths", "amplitudes", "harmonics", "zero_phase", "period")
 
 _PARAMETER_PATTERNS = {
     "shape": re.compile(r"^[DGCK]\d+b?$"),
+    "widths": re.compile(r"^D\d+b?$"),
     "amplitudes": re.compile(r"^A\d+b?$"),
     "harmonics": re.compile(r"^(H\d+|S1)$"),
 }
@@ -261,7 +263,9 @@ def fit_borrowed(
         two_component="A1b" in r.p,
     )
     stats.update(
-        assess_fit(t, y, s, period, model, r, seg=seg, order=order, scale=amp_scale).to_stats()
+        assess_fit(
+            t, y, s, period, model, r, seg=seg, order=order, scale=amp_scale
+        ).to_stats()
     )
     solution = ModelSolution(
         config=config,

@@ -11,11 +11,14 @@ Run from the repository root::
 
     MPLBACKEND=Agg python examples/spot_120_offset_figure.py
     MPLBACKEND=Agg python examples/spot_120_offset_figure.py --set m11
+    MPLBACKEND=Agg python examples/spot_120_offset_figure.py --set mix
 
 ``--set n01`` (the default) reads the 1 percent timings and writes
 ``results/synthetic_scoring/spot_120_select/offset_vs_longitude.png``.
-``--set m11`` reads the Tmag 11 timings and writes the same names under
-``results/synthetic_scoring/spot_120_select_m11/``.
+``--set m11`` reads the additive Tmag 11 timings and writes the same names
+under ``results/synthetic_scoring/spot_120_select_m11/``. ``--set mix`` reads
+the mixed-trend timings and writes them under
+``results/synthetic_scoring/spot_120_mix_time/``.
 """
 
 from __future__ import annotations
@@ -53,6 +56,12 @@ SETS = {
         MAVKA_ROOT / "detached_120_m11" / "tables",
         GENERATOR / "results" / "m11" / "detached",
         "Tmag 11 (2.6 mmag at 120 s)",
+    ),
+    "mix": (
+        ROOT / "results" / "synthetic_scoring" / "spot_120_mix_time",
+        MAVKA_ROOT / "detached_120_mix" / "tables",
+        GENERATOR / "results" / "mix" / "detached",
+        "Tmag 11, mixed trend (2.6 mmag at 120 s)",
     ),
 }
 TIMING = SETS["n01"][0] / "timing_120_w0.12.csv"
@@ -313,7 +322,7 @@ def main() -> None:
         "--set",
         choices=tuple(SETS),
         default="n01",
-        help="n01 is the 1 percent set. m11 is the Tmag 11 set.",
+        help="n01 is 1 percent. m11 is additive Tmag 11. mix is the mixed trend.",
     )
     args = parser.parse_args()
     OUT, MAVKA, CURVES, NOISE = SETS[args.set]

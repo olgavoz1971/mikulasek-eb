@@ -307,6 +307,22 @@ The baseline is a polynomial per segment in magnitudes. In flux that is a multip
 
 The generator adds its trend additively in flux because its author chose that, not because TESS does. A real light curve can have both kinds: an additive part (background, contamination) and a multiplicative part (pointing, aperture losses). The package does not decide between them. The real NSV 807 sector 97 file (QLP SAP, background subtracted) was tested with its own eclipses (`examples/nsv807_trend_kind.py`): the flux of the minima follows the flux of the maxima with a slope of 0.51 ± 0.06 (primary) and 0.61 ± 0.05 (secondary), which is the minimum-to-maximum ratio of the star, and with an intercept consistent with zero. A multiplicative trend predicts that, an additive one predicts a slope of 1. For that file the magnitude baseline is the right one. The same test on the synthetic G4 secondary gives a slope of 1.004 ± 0.009, as injected. One real star, one sector, a trend range of 2.4 percent. This does not generalise to other stars or sectors.
 
+### 11.4c Tiered search (2026-11-04)
+
+`propose_candidates` still offers profile 1 only. Trying profiles 2, 3 and 4 as well, with every harmonic set and both baseline orders, is too many full fits. The experiment `examples/batch_m11_tiered_c600.py` searches in three steps and is not part of the package:
+
+1. Baseline order, on profile 1 and the smallest harmonic set the rules propose.
+2. Profiles 1 to 4, with that harmonic set and the winning baseline.
+3. The remaining harmonic sets, on the winning profile and baseline.
+
+Each step refits the previous winner together with the new candidates, so the BIC values share the same points. The search stops after two steps in a row that lower BIC by less than 10. That stop did not fire on these files. Profiles 5 to 7 are not tried: the staged fit frees Gamma, and they have none.
+
+On G5 at 600 s, with the old additive trend, the three steps chose the same model as fitting all 16 candidates: profile 3, harmonics (1, 2, 3), linear baseline, 5.91 mmag, in 35 s against about 5.5 min. The profile-1 fits with harmonics (1, 2, 3), which do not converge, were never started. On all eight 600 s files of that set the detached stars stayed on profile 1 and the contact and semi-detached stars moved to profile 3. G4 and G7 stayed at 20.17 and 16.28 mmag. A different profile did not repair them. The cause was the additive flux trend, recorded in section 11.4b.
+
+The generator then repeated the degradation with a mixed trend: peak-to-peak 3 percent of the median out-of-eclipse flux, 80 percent multiplicative and 20 percent additive, same ramp, gap step and drift (`results/mix/`). The same search at 600 s, fallback off, gives G1 2.34, G2 2.67, G4 5.71, G5 2.09, G6 3.92 and G8 2.32 mmag. G4 no longer shows two bands in the folded primary. G7 stops: both profile-1 candidates are `bound-active` (secondary width negative), so with the fallback off there is no winner to carry forward. With the fallback on, those two finish at about 14.6 mmag and lose. Profile 3 with harmonic 2 is chosen, Levenberg-Marquardt, 5.34 mmag, in 111 s. Results: `results/synthetic_scoring/batch_mix_tiered_c600/` and `g7_mix_c600_fallback/`.
+
+**Warning.** `retry_bound_active` (default true) fits every `bound-active` candidate a second time, with the trust-region solver, and that second fit is a full staged fit. On G7 the first step alone took 43 s because both candidates were fitted twice. A light curve on which several candidates land on a bound pays that cost for each of them, and the time grows with the number of such candidates, not with the number of files. Leaving the fallback off is faster and, as on this G7 file, can stop the search with no solution. A retry after "did not converge" is not this default. It was tried on G5 only, and it is slower still, because the first fit has already run to its evaluation limit before the second solver starts.
+
 ### 11.5 Not done
 
 - The full-width limit is judged after the fit. It is not a constraint inside either solver.

@@ -9,3 +9,4 @@ __pycache__/
 results/synthetic_scoring/spot_degraded/fits/120
 results/synthetic_scoring/spot_degraded/fits/600
 results/synthetic_scoring/spot_degraded/fits/1800
+results/*
