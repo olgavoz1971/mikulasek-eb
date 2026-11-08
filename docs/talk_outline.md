@@ -1014,6 +1014,104 @@ $PY scripts/step8_timing_files_w015.py
 
 `prepare_files.py` writes only the FFI copy `data/lc_tess_FFI_sector_30_user_prepared.vot`. `step4_sector4.py` produces no timings: at 1800 s every event is rejected. The sector 4 timing files come from `step6_timing_files.py`.
 
+### Sector 4 error column, checked on the MAST file (2026-11-08)
+
+The redownloaded sector 4 VOTable reports a SAP error of 0.47 mmag. That is the MAST column, not a conversion mistake. In `hlsp_tess-spoc_tess_phot_0000000035119266-s0004_tess_v1_lc.fits` the column `SAP_FLUX_ERR` has median 2.45 e-/s on a median `SAP_FLUX` of 5720 e-/s, which is 0.47 mmag, and `PDCSAP_FLUX_ERR` has median 2.98 e-/s. The times in that file are BJD minus 2457000. The keyword `EXPOSURE` is 20.53 days, the sector livetime. The cadence is `TIMEDEL` = 1800 s, and `INT_TIME` is 1.98 s. The 175 mmag error and the constant residual sigma of 3.64 mmag belong to the earlier QLP file. No constant sigma is applied to this sector 4 file. Sector 4 is not fitted in this step.
+
+### Tiered search on NSV 807, sector 30 SAP (2026-11-08)
+
+Both sector 30 files were fitted from the SAP flux only. `pdcsap_flux` was not read. Magnitudes use the photcal of `sap_flux`. The exposure is 0.8 of the cadence, 96 s and 480 s, with 21 subsamples. It is taken from the times, not from the file `exptime`. At 120 s the package gate would have left the integration off, because 96 s is about 0.02 of the measured FWHM and the gate asks for 0.1. It was switched on for this star. At 600 s the gate itself asked for it (0.12 of the FWHM).
+
+The search is the three-step one (`examples/nsv807_s30_tiered.py`, results in `results/nsv807/s30_tiered/`). Trust-region fallback off. The features call the star contact-like: equal depths, no flat stretch, so the harmonic sets are (2, 3) and (1, 2, 3). The O'Connell term is on. Each step compares the previous winner with the new candidates. A step that gains less than 10 in BIC does not, by itself, stop the search. The search stops only after two such steps in a row. That stop did not fire. Every finished candidate keeps its profile figure and its trend figure (12 of each). Nothing is timed.
+
+| File | Step 1, baseline | Step 2, profile | Step 3, harmonics | Chosen | rms |
+| --- | --- | --- | --- | --- | --- |
+| 120 s SPOC | constant per segment beats a line by 8.7; gain 0 | profile 3, gain 28.1; profiles 1 and 2 stay at 5.08 mmag; profile 4 is 6.74 | H1 does not pay: rms 4.41 against 4.48, BIC worse by 10.5 | profile 3, harmonics (2, 3), constant per segment | 4.50 mmag |
+| 600 s TESS-SPOC | same, a line is worse by 8.9 | profile 3, gain 72.9 | H1 wins by 4.6, under the decisive difference of 10 | profile 3, harmonics (1, 2, 3), constant per segment | 5.90 mmag |
+
+The two cadences agree on profile 3 and on a constant baseline in each of the two segments. They disagree on the first harmonic, and the 600 s gain that brings it in is smaller than the difference the search treats as decisive. Both chosen solutions have status ok, and both report a rank-deficient Jacobian, so the formal parameter errors are not used. The chosen profile figure and trend figure are copied to `fits/chosen/` and `trends/chosen/`. The eclipse set for the later timing is the one fixed by coverage at the widest window, the same set for both cadences.
+
+The primary is flat at the bottom and none of these single-component templates follow it. The binned primary residual of the 120 s choice swings from +4.9 mmag to -6.9 mmag. The search does not propose a two-component candidate. Inside a fit the second component is tried only when rms/noise exceeds 1.5. Profile 3 is at 1.35, so it was skipped. Profiles 1 and 4 did try it and rejected it: the rms gain was 13 percent, below the gate of 25 percent, and only one start agreed. Forcing the second component on the chosen profile 3, primary only, lowers the 120 s rms from 4.50 mmag to 4.16 mmag and the 600 s rms from 5.90 mmag to 5.79 mmag. The starts still do not agree, so the package does not adopt it. The drawn trial, with that one gate loosened so the curve is visible, is `fits/TIC35119266_s30_SPOC_120s__2c_primary_shown.png` and the same name for the 600 s file. The primary bins are still about 4 mmag. The second component flattens the bottom a little. It does not follow the flat bottom.
+
+### Protocol of the tiered fit for a real light curve (locked, 2026-11-08)
+
+Status: locked on 2026-11-08. The two files named `..._2c_primary_shown` in that section are exploratory trials, not results: a condition of the package was loosened to draw them, and their titles say "adopted" although the package rejected them. They are to be removed from the results folder.
+
+Code: `examples/nsv807_s30_tiered.py` runs the protocol, steps 0 to 7. By default it reads the NSV 807 sector 30 file and writes `results/nsv807/s30_protocol/`. Another light curve is run with `--file`, `--out`, `--flux` and `--flux-err`, for example for AA And: `python nsv807_s30_tiered.py --file ../data/lc_discovery_TIC_455790537_SPOC_sector_16.vot --out ../results/tic455790537_s16_protocol --flux flux --flux-err flux_err`. It uses `select_model` and the candidate builder of the package (`src/mikulasek_eb/selection.py`, `candidates.py`), and the option `keep_curvature` added to the fit policy (`config.py`, `pipeline.py`). `examples/nsv807_s30_forced.py` is not part of the protocol. It forces the second component on a saved candidate, as a look.
+
+Marks: **Decided** is a choice you made. **Package** is how the package works now. **Suggestion** is not decided.
+
+**Step 0. Input.** Decided: SAP flux only, converted with the photcal of the file. Times are TDB, barycentric. Period and epoch come from the file. The HJD against TDB question of the epoch is ignored. Decided: the exposure is 0.8 of the cadence (96 s at 120 s, 480 s at 600 s), because the `exptime` of the file is the cadence. Package: exposure integration is on only if the exposure divided by the eclipse width exceeds 0.1. Decided: we follow that rule and do not force it on.
+
+**Step 1. Outlier control.** Two options were tried on sector 30, without refitting. Decided: develop option A first. Option B stays as a comparison.
+
+*Option A. 5 sigma from the folded light curve.* Fold by the file period and epoch. Take the median magnitude in 400 phase bins. The residual of each point is its magnitude minus the median of its bin. The local sigma is 1.4826 times the median absolute deviation of the residuals in that bin. A point is flagged when its residual is more than 5 local sigma. It needs only time and magnitude, so it works on any file. Result on sector 30:
+
+| | 120 s | 600 s |
+| --- | --- | --- |
+| Points flagged | 106 of 18354 | 50 of 3666 |
+| Within 0.08 cycles of an eclipse | 17 | 5 |
+| Brighter / fainter than the fold | 98 / 8 | 24 / 26 |
+| Scatter of the whole curve | 4.45 mmag | 6.30 mmag |
+
+The flagged points lie at all phases, none above the maximum or below the minimum. They fall on days 11 to 13 and 26 to 27 after the start, where `sap_bkg` rises from a median of about 1800 e-/s to 70 000 (120 s) and 340 000 (600 s) e-/s. Some flagged points sit almost on the curve, on the steep branches, where the local sigma of a bin is small. Nothing was tuned. The threshold of 5 and the 400 bins were first choices. At 600 s 400 bins hold about 9 points each, so the local sigma is poorly measured there. Open: whether flagged points are removed once or in rounds, and the number of bins. Pictures, in `results/nsv807/s30_outliers/`: `TIC35119266_s30_SPOC_120s_outliers.png` and `TIC35119266_s30_TESS-SPOC_600s_outliers.png` (residual against phase, against time, and `sap_bkg`), and `..._folded_outliers.png` for both files (flagged points on the folded curve).
+
+*Option B. Steep background.* A point is removed when the rate of change of `sap_bkg` is above the median of that rate plus 5 robust sigma. The threshold comes from the data: 9850 e-/s per day at 120 s and 2341 at 600 s. It needs the `sap_bkg` column, which another file may not have. Result:
+
+| | 120 s | 600 s |
+| --- | --- | --- |
+| Points removed | 1009 (5.5%) | 371 (10.1%) |
+| Scatter of kept points | 3.77 mmag | 3.35 mmag |
+| Robust scatter (MAD sigma) | 3.43 mmag | 2.84 mmag |
+| Option A flags left among kept points | 7 (was 106) | 14 (was 50) |
+
+It removes the whole rising branch of each orbit end, so good points are removed with the bad ones, evenly at all phases. A rule on the background level (median plus 5 robust sigma) removes 19.5% of the points and was not used. Pictures: `..._bkg_rule.png` for both files, the folded curve and `sap_bkg` against time with the removed points in red.
+
+Rule for either option: removed points are listed and are not deleted from the file. The rms is reported for the kept points, and the number removed is reported next to it.
+
+**Step 2. Candidates.** Package: from the folded curve the package measures features and proposes the harmonic sets, the baseline orders, the O'Connell term and whether to integrate over the exposure. For sector 30 the star is called contact-like (equal depths, no flat stretch), so the harmonic sets are (2, 3) and (1, 2, 3). The baseline orders are 0 and 1. The O'Connell term is on. Package: the baseline is one level or one line on each piece of the light curve, and a new piece starts wherever two points are more than 0.5 d apart. Sector 30 has one such gap, of about 1.07 d. Decided: the baseline is split there, one polynomial per orbit, with one shared eclipse template. This is what the package does and what the base paper does, with one instrumental term for each observational subset (Sect. 3.1). The 0.5 d value is the package's, not the paper's. Decided: the search starts from the richest proposed harmonic set, (1, 2, 3), and step 3 tries the smaller ones. Why: a set that is too small leaves a large rms/noise and sends every candidate into the second-component trial.
+
+**Step 3. Tiered search.** Each step compares the previous winner with new candidates on the same points.
+
+1. Baseline. Profile 1, the smaller harmonic set, baseline order 0 against 1. Why: the baseline is cheap to decide and does not change the shape.
+2. Profile. The winning baseline and harmonics, profiles 1 to 4 of Table 2 of Mikulášek (2015), and profile 1 again with the curvature C1 and C2 kept free and never set to zero (`keep_curvature`, name suffix `_C`). Why: the profile is the main choice of shape, and the staged fit otherwise sets C to zero for flat-bottomed minima. Profiles 5 to 7 are not tried. Package change: `keep_curvature` is a new option of the fit policy.
+3. Harmonics. The winning profile and baseline, every other proposed harmonic set.
+
+The selection criterion is BIC, and a difference of 10 counts as decisive. The search stops when two steps in a row each gain less than 10. A candidate counts only if its fit status is `ok`. The trust-region retry is off: it was copied from the synthetic tiered experiment and is our choice. Known weaknesses: the baseline is decided with profile 1, which is wrong for this star. BIC treats every point as independent, so its gains are overstated. BIC judges the whole curve, and timing needs the eclipse shape.
+
+**Step 4. Second profile component.** Package: it is not a candidate of the search. Inside the fit of each candidate it is tried only when the root mean square residual is more than 1.5 times the noise measured outside the eclipses. It is kept only if the rms falls by at least 25 percent and at least two of the four starting values reach the same fit. Suggestion: the package has an option that adds a twin of every candidate with the second component forced on. The twins would be judged by the same BIC, with no rms condition and no later look.
+
+**Step 5. Baseline.** One polynomial per orbit, as in step 2, with one shared eclipse template. The order is chosen in step 3 between the orders the package proposes. The baseline is not cut at scattered-light rises, only at gaps over 0.5 d.
+
+**Step 6. Pay more attention to the rms in the minima.** Suggestion, not decided. Timing uses the eclipse shape, and the root mean square residual of the whole curve can look good while the flat bottom is missed. Report the rms in a window around each minimum, and the binned residual at the minima, next to the whole-curve rms. It would be a reported number. It would not replace BIC.
+
+**Step 7. Output.** One folder `chosen` with the final solution and its two figures per light curve, nothing else. The title of every figure has the light curve name, a line break, then the profile number with the harmonics and baseline, the fit status (`ok` or `bound-active`), `adopted` or `not adopted` for the second component, and the rms in mmag. Every candidate keeps its figures in a separate folder. Figures are redrawn from the saved solutions. A run is not repeated without being asked.
+
+### Results of the locked protocol on NSV 807 and AA And (2026-11-08)
+
+*NSV 807, sector 30, 120 s (18354 rows, 106 removed by step 1; the whole run takes 43 s).*
+
+| Step | Winner | rms (mmag) | BIC gain |
+|---|---|---|---|
+| 1 baseline | p1_h123_b0 | 4.83 | 6.9 over order 1 |
+| 2 profile | p3_h123_b0 | 4.28 | 1.4 over profile 1 |
+
+Profile 2 is 4.84 mmag, profile 4 is 6.51 mmag and the curvature candidate `p1_h123_b0_C` is 4.72 mmag. The search stops after step 2. The earlier run with the smallest harmonic set gave the same winner, p3 with rms 4.35 mmag. C1 and C2 of that `_C` candidate were -0.078 and -0.191, so the curvature made the bottom more pointed, not flatter.
+
+*AA And (TIC 455790537, sector 16, 120 s, 16717 rows).* The whole run takes about 45 s. Baseline order 1 wins (rms 2.81 mmag, BIC better by 9.0), profile 1 and profile 2 tie, and the package adopts a second component by its own rules. The adopted fit follows the flat bottom of the primary and the residuals are about 5 mmag with no spike at the minima. This was read from the figure. The trial record was not opened.
+
+**Conclusion: the flat-bottomed, asymmetric minima of NSV 807 are not followed.** Under the locked protocol no candidate of the search reproduces the minima. The fit is pointed where the data are flat, and the residuals have spikes of 15 to 35 mmag at phases 0 and 0.5 with an antisymmetric wiggle beside them. What was tried and what it gave:
+
+- Curvature C free (`_C`): rms 4.72 mmag, BIC 6.8 worse than the winner. C went negative.
+- Second component forced on the chosen profile 3: the rms gain is 6 percent on the primary only and 10 percent on both minima. The package rejects it because only one of four starts agrees.
+- Second component forced on profile 1 with harmonics (1, 2, 3): gain 12 percent (primary) and 19 percent (both). The same single failed condition, one start of four.
+- Weight 3 inside 0.12 cycles of the minima: the trial numbers are identical to weight 1 to every digit. It seems the weight does not reach the second-component refit. This was not confirmed in the code.
+- Centres of the minima, measured by mirror symmetry against the fitted ephemeris: primary -0.001 phase (about -33 s), secondary 0.000. The centres are not the problem.
+
+Asymmetry of the minima is our explanation, **not checked**: the flat bottom sits to one side of the fitted centre and the residual wiggle is antisymmetric, as a symmetric profile leaves on an asymmetric minimum. The odd part of the minimum around its centre was not measured. The package warns "A1 is not much deeper than A2; period may be P/2" for this star. That was not examined either.
+
+Decided: we stop here. NSV 807 is not timed from a Mikulášek fit that follows the minima. We go on to the other steps of the plan. Open for later: the per-start spread of the second-component trial, the odd part of the minima, the period question, and whether the weight reaches the second-component refit.
+
 ### Timing window on NSV 807
 
 Sectors 30 and 97. Wider windows (0.35 and 0.5) shrink the formal sigma and increase the real O-C scatter. rms(O-C/sigma) rises to 1.4 to 2.1. Window 0.15 has the smallest scatter. Window 0.25 has about honest errors. The window is reported with every timing. The NSV 807 window is not the window of the detached spot experiment. That experiment uses a half-width of 0.12 cycles.

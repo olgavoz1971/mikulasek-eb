@@ -372,7 +372,7 @@ def run_staged_fit(
     d_rel = r3.err["D1"] / abs(r3.p["D1"])
     g_rel = r3.err["G1"] / abs(r3.p["G1"])
     c1_weak = abs(r3.p["C1"]) < 3.0 * r3.err["C1"]
-    if c1_weak or d_rel > 0.10 or g_rel > 0.10:
+    if not config.keep_curvature and (c1_weak or d_rel > 0.10 or g_rel > 0.10):
         logger.info("Fix C1=C2=0 (weak C1 or large D/G errors).")
         p_fix = complete_template(r2.p, model)
         p_fix["C1"] = 0.0

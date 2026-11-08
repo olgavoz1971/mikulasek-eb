@@ -117,6 +117,13 @@ class FitPolicy:
             ``bound-active``, ``select_model`` fits that same candidate again
             with the trust-region solver. The default is True. Starting with
             the trust-region solver stays off.
+        keep_curvature (bool): Profile 1 only. Keep the curvature C free. The
+            default is False: the staged fit sets C1 = C2 = 0 when C1 is weak
+            (under 3 sigma) or when D or Gamma has a relative error above 0.1.
+            With True that step is skipped, and C1 and C2 are freed with D2
+            and Gamma2 in the separate-shape step, which keeps them if chi2
+            drops by more than ``separate_shape_chi2_frac``. A flat bottom
+            (total eclipse) needs C (Mikulasek et al. 2015, Sect. 4.1).
     """
 
     gamma_starts: tuple = (0.5, 1, 2, 4, 8)
@@ -137,6 +144,7 @@ class FitPolicy:
     two_comp_timing_agreement_sigma_max: float = 1.0
     bounded_solver: bool = False
     retry_bound_active: bool = True
+    keep_curvature: bool = False
 
 
 @dataclass(frozen=True)
@@ -206,6 +214,7 @@ class FitConfig:
     two_comp_timing_agreement_sigma_max: float = 1.0
     bounded_solver: bool = False
     retry_bound_active: bool = True
+    keep_curvature: bool = False
 
 
 def _layer_from_dict(cls, data: dict, layer: str):
@@ -317,6 +326,10 @@ class Config:
             raise ConfigError("bounded_solver must be true or false.")
         if not isinstance(p.retry_bound_active, bool):
             raise ConfigError("retry_bound_active must be true or false.")
+        if not isinstance(p.keep_curvature, bool):
+            raise ConfigError("keep_curvature must be true or false.")
+        if p.keep_curvature and m.profile != 1:
+            raise ConfigError("keep_curvature needs profile 1, the only one with C.")
         if p.two_comp_rel_err_scope not in ("all", "core"):
             raise ConfigError("two_comp_rel_err_scope must be 'all' or 'core'.")
         if p.two_comp_min_agreeing_starts < 1:
