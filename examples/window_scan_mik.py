@@ -36,6 +36,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 import mikulasek_eb as eb
+from mikulasek_eb.timing import fit_ephemeris
 from mikulasek_eb.solution import ModelSolution
 
 logger = logging.getLogger(__name__)
@@ -181,7 +182,20 @@ def window_is_covered(
     return bool(np.max(np.diff(edges)) <= tolerance)
 
 
-def scan_kind(kind, t_mjd, mag, sig, solution, epoch_jd, period, t_jd, cadence_d):
+def scan_kind(
+    kind,
+    t_mjd,
+    mag,
+    sig,
+    solution,
+    epoch_jd,
+    period,
+    t_jd,
+    cadence_d,
+    recipe_kwargs=None,
+    reference="mean",
+    centres_from_fit=False,
+):
     """Scan one eclipse kind.
 
     Args:
@@ -194,11 +208,23 @@ def scan_kind(kind, t_mjd, mag, sig, solution, epoch_jd, period, t_jd, cadence_d
         period (float): File period, days.
         t_jd (np.ndarray): The same times in JD, for the coverage test.
         cadence_d (float): Cadence in days.
+        recipe_kwargs (dict | None): Extra ``TimingRecipe`` fields, for example the
+            point rule. None keeps the package defaults of the synthetic scans.
+        reference (str): ``mean`` takes the rms of O-C about its mean, as in the
+            synthetic scans. ``linear`` takes it about a straight line fitted to the
+            same times against the eclipse number, so that a stale file period does
+            not enter the rms.
+        centres_from_fit (bool): False predicts the eclipse centres from the file
+            epoch and period, as in the synthetic scans. True takes them from the
+            wide-window timing (the fitted time of a timed eclipse, the fitted
+            prediction of a rejected one), so that the file ephemeris is not used
+            to place an eclipse.
 
     Returns:
         tuple[list[dict], list[dict], float]: Summary rows, per-eclipse rows and the
         width D in cycles.
     """
+    extra = dict(recipe_kwargs or {})
     width = float(solution.params[WIDTH_KEY[kind]])
     step = STEP_FRACTION * width
     halves = np.arange(1, int(MAX_HALF / step) + 1) * step
@@ -208,7 +234,7 @@ def scan_kind(kind, t_mjd, mag, sig, solution, epoch_jd, period, t_jd, cadence_d
         mag,
         sig,
         solution,
-        eb.TimingRecipe(window=float(halves[-1]), clip_outliers=False),
+        eb.TimingRecipe(window=float(halves[-1]), clip_outliers=False, **extra),
         which=(kind,),
     )
     predicted = {}
@@ -217,7 +243,12 @@ def scan_kind(kind, t_mjd, mag, sig, solution, epoch_jd, period, t_jd, cadence_d
     for item in wide.rejected[kind]:
         predicted[float(item["E"])] = float(item["T_pred_jd"])
     cycles = sorted(predicted)
-    centre = {e: ephemeris_jd(epoch_jd, e, period) for e in cycles}
+    if centres_from_fit:
+        centre = dict(predicted)
+        for e, t_fit in zip(wide.timings[kind]["E"], wide.timings[kind]["T"]):
+            centre[float(e)] = float(t_fit)
+    else:
+        centre = {e: ephemeris_jd(epoch_jd, e, period) for e in cycles}
     in_set = {
         e: window_is_covered(t_jd, centre[e], float(halves[-1]) * period, cadence_d)
         for e in cycles
@@ -237,7 +268,7 @@ def scan_kind(kind, t_mjd, mag, sig, solution, epoch_jd, period, t_jd, cadence_d
             mag,
             sig,
             solution,
-            eb.TimingRecipe(window=float(half), clip_outliers=False),
+            eb.TimingRecipe(window=float(half), clip_outliers=False, **extra),
             which=(kind,),
         )
         got = out.timings[kind]
@@ -282,9 +313,16 @@ def scan_kind(kind, t_mjd, mag, sig, solution, epoch_jd, period, t_jd, cadence_d
         if len(used) >= 2:
             mean = float(np.mean(used))
             row["mean_oc_s"] = f"{mean:.3f}"
-            row["rms_oc_s"] = f"{float(np.sqrt(np.mean((used - mean) ** 2))):.3f}"
+            if reference == "linear" and len(used) >= 3:
+                _, res_d, _ = fit_ephemeris(
+                    times[in_mask], sigma[in_mask], epochs[in_mask], 1
+                )
+                about = res_d * DAY_S
+            else:
+                about = used - mean
+            row["rms_oc_s"] = f"{float(np.sqrt(np.mean(about**2))):.3f}"
             row["rms_over_sigma"] = (
-                f"{float(np.sqrt(np.mean(((used - mean) / used_sigma) ** 2))):.3f}"
+                f"{float(np.sqrt(np.mean((about / used_sigma) ** 2))):.3f}"
             )
             row["median_sigma_s"] = f"{float(np.median(used_sigma)):.3f}"
         summary.append(row)
@@ -309,6 +347,7 @@ def draw(
     path: Path,
     title: str,
     mavka: dict[str, float] | None = None,
+    adopted: dict[str, float] | None = None,
 ) -> None:
     """Plot rms of O-C and rms of O-C over sigma against half-window over D.
 
@@ -319,6 +358,8 @@ def draw(
         title (str): Figure title.
         mavka (dict[str, float] | None): Adopted MAVKA half-width in cycles, by eclipse
             kind. Drawn as a vertical line at that half-width divided by D.
+        adopted (dict[str, float] | None): Adopted half-width in cycles, by eclipse
+            kind. Drawn as a dotted vertical line labelled with its multiple of D.
     """
     fig, axes = plt.subplots(1, 2, figsize=(12, 4.5), sharex=True)
     for kind, colour in (("primary", "tab:blue"), ("secondary", "tab:red")):
@@ -343,6 +384,17 @@ def draw(
                     ls="--",
                     lw=1,
                     label=f"MAVKA {kind} {mavka[kind]:.4f} ({ratio:.2f} D)",
+                )
+    if adopted is not None:
+        for kind, colour in (("primary", "tab:blue"), ("secondary", "tab:red")):
+            ratio = adopted[kind] / widths[kind]
+            for ax in axes:
+                ax.axvline(
+                    ratio,
+                    color=colour,
+                    ls=":",
+                    lw=1.5,
+                    label=f"adopted {kind} {ratio:.1f} D",
                 )
     axes[0].set_ylabel("rms of O-C on the fixed set (s)")
     axes[1].set_ylabel("rms of (O-C) / sigma")

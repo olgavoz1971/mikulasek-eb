@@ -57,10 +57,13 @@ DATA = Path("/home/voz/projects/UPJS/lc_shipper/data")
 FILES = ("TIC35119266_s30_SPOC_120s.vot",)
 OUT = Path(__file__).resolve().parents[1] / "results" / "nsv807" / "s30_protocol"
 PROFILES = (1, 2, 3, 4)
+START_PROFILE = 1
 SKIP_OUTLIERS = False
+GAP_DAYS = None
 FLUX = "sap_flux"
 FLUX_ERR = "sap_flux_err"
 OUTLIER_BINS = 400
+SIGMA_FROM_BINS = False
 OUTLIER_NSIG = 5.0
 MIN_POINTS_PER_BIN = 5
 MAD_TO_SIGMA = 1.4826
@@ -178,7 +181,12 @@ def fold_outliers(payload: dict) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
 
 
 def outlier_figure(
-    payload: dict, flag: np.ndarray, phase: np.ndarray, path: Path, stem: str
+    payload: dict,
+    flag: np.ndarray,
+    phase: np.ndarray,
+    path: Path,
+    stem: str,
+    rule: str = "outliers 5 sigma from the folded curve",
 ) -> None:
     """Draw the folded light curve with the flagged points marked.
 
@@ -188,6 +196,7 @@ def outlier_figure(
         phase (ndarray): Phase of every point.
         path (Path): PNG file to write.
         stem (str): File stem, for the title.
+        rule (str): Name of the rule that flagged the points, for the title.
     """
     import matplotlib.pyplot as plt
 
@@ -202,10 +211,7 @@ def outlier_figure(
         ax.set_xlabel("Phase")
         ax.set_ylabel("Magnitude")
         ax.legend()
-    axes[0].set_title(
-        f"{stem}\noutliers 5 sigma from the folded curve: "
-        f"{int(flag.sum())} of {len(flag)} flagged"
-    )
+    axes[0].set_title(f"{stem}\n{rule}: {int(flag.sum())} of {len(flag)} flagged")
     axes[1].set_title("Same, zoomed to the range of the kept points")
     fig.tight_layout()
     fig.savefig(path, dpi=120)
@@ -304,6 +310,39 @@ def constant_sigma_from_fit(payload: dict, t_mjd: np.ndarray, stem: str) -> dict
     )
     result = dict(payload)
     result["sig"] = np.full_like(payload["mag"], rms)
+    return result
+
+
+def constant_sigma_from_bins(payload: dict, stem: str) -> dict:
+    """Set one constant sigma from the scatter about the phase-bin medians.
+
+    Used only for a file without an error column for the SAP flux, when the
+    researcher chose this instead of the pilot fit. The sigma is the robust
+    scatter (1.4826 times the median absolute deviation) of the residuals of the
+    points from the median of their phase bin, with ``OUTLIER_BINS`` bins. No model
+    is fitted. The result is smaller than the rms of a model fit by the misfit of
+    that model.
+
+    Args:
+        payload (dict): Light curve with placeholder sigma.
+        stem (str): File stem, for the log.
+
+    Returns:
+        dict: Copy of the payload with the constant sigma (mag) in ``sig``.
+
+    Raises:
+        ValueError: If a phase bin cannot be measured (see ``fold_outliers``).
+    """
+    _, residual, _ = fold_outliers(payload)
+    sigma = MAD_TO_SIGMA * float(np.median(np.abs(residual - np.median(residual))))
+    logger.info(
+        "%s constant sigma from %d phase bins: %.2f mmag",
+        stem,
+        OUTLIER_BINS,
+        1e3 * sigma,
+    )
+    result = dict(payload)
+    result["sig"] = np.full_like(payload["mag"], sigma)
     return result
 
 
@@ -538,10 +577,18 @@ def one_file(name: str) -> tuple[list[dict], dict]:
     else:
         payload = remove_outliers(payload, stem)
     t_mjd = eb.absolute_jd_to_mjd(payload["t"])
-    if FLUX_ERR is None:
+    if FLUX_ERR is None and SIGMA_FROM_BINS:
+        payload = constant_sigma_from_bins(payload, stem)
+    elif FLUX_ERR is None:
         payload = constant_sigma_from_fit(payload, t_mjd, stem)
+    settings = None if GAP_DAYS is None else eb.FeatureSettings(gap_days=GAP_DAYS)
     features = eb.extract_features(
-        t_mjd, payload["mag"], payload["sig"], payload["period"], payload["epoch_jd"]
+        t_mjd,
+        payload["mag"],
+        payload["sig"],
+        payload["period"],
+        payload["epoch_jd"],
+        settings,
     )
     sampling = features.sampling
     logger.info(
@@ -562,7 +609,7 @@ def one_file(name: str) -> tuple[list[dict], dict]:
     total = 0.0
     gains: list[float] = []
 
-    step1 = [make_candidate(base, 1, sets[0], order) for order in orders]
+    step1 = [make_candidate(base, START_PROFILE, sets[0], order) for order in orders]
     result, sec = run_step(
         "1 baseline", step1, t_mjd, payload, features, stem, saved, rows
     )
@@ -577,9 +624,12 @@ def one_file(name: str) -> tuple[list[dict], dict]:
         + [
             make_candidate(base, profile, sets[0], order)
             for profile in PROFILES
-            if profile != 1
+            if profile != START_PROFILE
         ]
-        + [make_candidate(base, 1, sets[0], order, keep_curvature=True)]
+        + [
+            make_candidate(base, 1, sets[0], order, keep_curvature=True)
+            for _ in ([0] if START_PROFILE == 1 else [])
+        ]
     )
     result, sec = run_step(
         "2 profile", step2, t_mjd, payload, features, stem, saved, rows
@@ -621,7 +671,12 @@ def one_file(name: str) -> tuple[list[dict], dict]:
         "harmonics": "".join(map(str, solution.config.model.harmonics)),
         "baseline_order": str(solution.config.data.baseline_order),
         "baseline_pieces": str(
-            1 + int(np.sum(np.diff(final.t_mjd) > solution.config.data.gap_split_days))
+            1
+            + int(
+                np.sum(
+                    np.diff(final.t_mjd) > (solution.config.data.gap_split_days or 0.5)
+                )
+            )
         ),
         "exposure_s": f"{sampling['exposure_s']:.1f}",
         "step_gains_bic": " ".join(f"{g:.1f}" for g in gains),
@@ -650,7 +705,8 @@ def main() -> None:
     Without arguments the NSV 807 file is used. ``--file`` (path), ``--out``
     (folder), ``--flux`` and ``--flux-err`` (column names) and ``--no-flux-err`` (constant sigma from a pilot fit) run the same protocol on another light curve.
     """
-    global OUT, FILES, FLUX, FLUX_ERR, SKIP_OUTLIERS
+    global OUT, FILES, FLUX, FLUX_ERR, SKIP_OUTLIERS, GAP_DAYS
+    global SIGMA_FROM_BINS, OUTLIER_BINS, START_PROFILE
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--file", help="VOTable path instead of the NSV 807 file")
     parser.add_argument("--out", help="output folder instead of s30_protocol")
@@ -666,7 +722,31 @@ def main() -> None:
         action="store_true",
         help="the file has no error column for the flux: constant sigma from a pilot fit",
     )
+    parser.add_argument(
+        "--gap-days",
+        type=float,
+        help="split the baseline at gaps longer than this (days); default is the package's 0.5",
+    )
+    parser.add_argument(
+        "--sigma-from-bins",
+        action="store_true",
+        help="with --no-flux-err: constant sigma from the scatter about phase-bin medians, no pilot fit",
+    )
+    parser.add_argument(
+        "--bins", type=int, help="number of phase bins (default %d)" % OUTLIER_BINS
+    )
+    parser.add_argument(
+        "--start-profile",
+        type=int,
+        default=1,
+        help="profile of the baseline step (default 1); the profile step still tries the others",
+    )
     args = parser.parse_args()
+    GAP_DAYS = args.gap_days
+    SIGMA_FROM_BINS = args.sigma_from_bins
+    if args.bins:
+        OUTLIER_BINS = args.bins
+    START_PROFILE = args.start_profile
     if args.flux:
         FLUX = args.flux
     if args.flux_err:

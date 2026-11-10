@@ -1112,6 +1112,441 @@ Asymmetry of the minima is our explanation, **not checked**: the flat bottom sit
 
 Decided: we stop here. NSV 807 is not timed from a Mikulášek fit that follows the minima. We go on to the other steps of the plan. Open for later: the per-start spread of the second-component trial, the odd part of the minima, the period question, and whether the weight reaches the second-component refit.
 
+### Protocol of the timing for a real light curve (locked, 2026-11-09)
+
+Status: locked on 2026-11-09. Marks as in the tiered-fit protocol: **Decided**, **Package**, **Suggestion**.
+
+Code: `examples/nsv807_timing.py`, with two modes, `scan` and `time`. It reuses `scan_kind` and `window_is_covered` of `examples/window_scan_mik.py` and `eb.time` of the package. The template is the saved `chosen/` solution of the tiered fit of the same light curve, and the points are the same cleaned points.
+
+Two rule sets are kept apart. The scan chooses a window and is a research step. The timing gives the result and keeps as many minima as the data allow.
+
+**Scan rules.**
+
+1. Decided: one fixed set of eclipses, chosen once at the widest window (the cap of 0.25 cycles). An eclipse belongs to the set when samples reach both ends of the window and no gap inside it is longer than 2 cadences. The same set is used at every window and for both cadences. Package: the rule is the one of `window_scan_mik.py`.
+2. Decided: the half-window runs from D/10 in steps of D/10 up to 0.25 cycles. D is the width of that eclipse kind in the solution (`D1` primary, `D2` secondary). The outlier cut of the timing is off, so that a missing time can only come from the window.
+3. Decided: the quantity is the rms of O-C on that fixed set, taken about a straight line fitted to the same times against the eclipse number. It is not taken about the file ephemeris, because the file period may have changed. The mean O-C is reported and does not choose the window.
+4. Decided: the adopted window is the narrowest one whose rms is within rms/sqrt(2(N-1)) of the best rms, N being the number of eclipses in the set.
+5. Decided: the window is scanned on the 120 s file and carried to the 600 s file as the same multiple of D, with the D of the 600 s solution.
+6. Decided: the scan uses the same point rule as the timing (below), so that the two agree.
+
+**Timing rules.**
+
+1. Decided: the window is the adopted multiple of D, capped at 0.25 cycles.
+2. Decided: a time is returned only when the fit can be identified. The timing fit has three free parameters, the shift and a baseline offset and slope. It needs more points than parameters and points on both sides of the predicted centre, so that both walls constrain the shift. The minimum is 4 points with at least 2 on each side. If every point lies on one side the shift cannot be told from the baseline, and no time is returned. The value 2 is our proposal. The package default is 3 per side.
+3. Decided: the number of points is not a gate beyond that. The MAVKA floor of 6 points is not used for the Mikulášek fit.
+4. Decided: nothing else rejects a time. The contact-wall check, the sigma cut and the clip of the package are off. Flags are kept instead: `walls_ok` (False when the wall check would have failed), `gap_in_window` (a gap in the window longer than 2 cadences), and the number of points and the degrees of freedom of each time.
+5. Decided: edge eclipses are timed when they meet rule 2. Nothing is rejected for lying at the start or the end of the series.
+6. Decided: there is no ladder of narrower windows. An eclipse that fails rule 2 at the adopted window gets no time and keeps its reason.
+7. Decided: the two methods do not share conditions. Each method uses its own window and point rule. Where they are compared it is on the eclipses that both timed, as paired differences.
+8. Package: the file epoch and period are used only to number the eclipses and to label the output. The predicted centres come from the fitted ephemeris of the solution.
+
+**Whole-cycle timing of a real light curve.** Code `examples/nsv807_whole_cycle.py`, which calls `time_cycles` of `examples/batch_whole_cycle_time.py` (the method of the section "Whole-cycle timing (2026-11-07)"). Decided: one shift of the whole saved template per orbital cycle, points with phase in (n - 0.25, n + 0.75) of the fitted ephemeris, a baseline of degree 1 in each cycle. Decided: the point rule is the one of the window timing, at least 4 points with at least 2 on each side of the cycle centre, not the MAVKA floor of 6 and 3. The flag is `gap` when a gap longer than 2 cadences lies inside the cycle, and `ok` otherwise. The primary and the secondary of a cycle share one time shift, so their times are not independent. The outputs are as for the window timing: `eclipses.csv`, the two `.dat` files, a summary figure per kind and one figure per timed cycle in `whole_cycle/fits/`.
+
+### Results of the timing of NSV 807 under the locked protocol (2026-11-09)
+
+Window multiples 3.0 D (primary) and 3.2 D (secondary), from the scan of sector 30 at 120 s (adopted 3.0 D and 3.2 D, rms about a straight line 2.98 s and 3.54 s on 69 and 65 eclipses of the fixed set; figure `results/nsv807/s30_protocol/timing_scan/rms_vs_half_width.png`). Each folder `timing/` holds `eclipses.csv`, the two `.dat` files, a summary figure per kind and one figure per timed eclipse.
+
+| Light curve | Primary: timed / no time | Secondary: timed / no time | Median sigma (s) primary, secondary | Gap flag | Wall check would fail |
+|---|---|---|---|---|---|
+| Sector 30, 120 s | 77 / 0 | 76 / 0 | 4.8, 4.5 | 5, 8 | 0, 0 |
+| Sector 30, 600 s | 77 / 0 | 76 / 0 | 7.5, 7.8 | 5, 5 | 4, 3 |
+| Sector 4, 1800 s | 62 / 3 | 60 / 6 | 6.3, 7.7 | 0, 2 | 62, 60 |
+| Sector 97, 200 s (constant sigma 8.73 mmag) | 145 / 4 | 143 / 4 | 6.9, 5.5 | 4, 3 | 1, 2 |
+
+Eclipses without a time are `too_few_points` or `one_side_uncovered`, that is, fewer than 4 points or fewer than 2 on a side. On sector 30 at 120 s the template follows the walls and the binned residual at the minimum is +6 mmag beside the centre and -7 mmag at the centre, the flat bottom missed. On the primary one time is about -96 s from the line, next to the data gap, and it carries the gap flag. The secondary figure and the flagged eclipses were not examined.
+
+**Doubts about the median sigma on sector 4.**
+
+- A median sigma of 6 to 8 s is small for 1800 s data. The windows hold as few as 4 points, and an eclipse of 4 points has 1 degree of freedom, so its formal sigma is not reliable.
+- The sector 4 flux errors are tiny (0.47 mmag, checked on the MAST file), and the formal sigma of the shift scales with them. It is not known whether the real scatter of the times matches.
+- The scatter of the times about a straight line was not compared with the formal sigma on this sector, so rms(O-C)/sigma is not known.
+- Every timed eclipse of sector 4 would fail the contact-wall check. The times rest on a few points on the walls and are flagged only.
+- The window is the 120 s multiple carried over. The 1800 s data were not scanned.
+- The column `n_points` of `eclipses.csv` is counted by `nsv807_timing.py` around the fitted time. The package selects the points around the predicted centre, so the two counts can differ by a point. On sector 97 the smallest `n_points` is 3 for a secondary, below the minimum of 4 that the rule requires, which shows the difference.
+
+### Results of the whole-cycle timing of NSV 807 (2026-11-09)
+
+Median formal sigma and rms of O-C about a straight line, for the window timing of the section above and for the whole cycle. The rms is taken on all timed eclipses, with no clip, so a single bad time raises it (the window rms of the primary at sector 30 includes one time about -96 s from the line next to the data gap, and the sector 97 secondary one outlier). The paired difference is whole cycle minus window, on the eclipses that both timed.
+
+| Light curve | Kind | Window: n, rms (s), median sigma (s) | Whole cycle: n, rms (s), median sigma (s) | Paired mean difference (s), scatter (s) |
+|---|---|---|---|---|
+| Sector 30, 120 s | primary | 77, 11.3, 4.8 | 76, 3.0, 2.7 | +25.9, 4.2 |
+| Sector 30, 120 s | secondary | 76, 4.2, 4.5 | 76, 3.1, 2.7 | +7.0, 5.4 |
+| Sector 30, 600 s | primary | 77, 12.1, 7.5 | 76, 4.2, 5.0 | +25.8, 4.7 |
+| Sector 30, 600 s | secondary | 76, 5.2, 7.8 | 76, 4.2, 5.0 | +7.9, 6.2 |
+| Sector 4, 1800 s | primary | 62, 5.3, 6.3 | 64, 3.7, 8.1 | +31.4, 5.6 |
+| Sector 4, 1800 s | secondary | 60, 5.9, 7.7 | 64, 3.7, 8.1 | -7.3, 5.8 |
+| Sector 97, 200 s | primary | 145, 4.7, 6.9 | 145, 5.9, 3.2 | +7.6, 6.0 |
+| Sector 97, 200 s | secondary | 143, 52.8, 5.5 | 145, 5.9, 3.2 | +8.9, 53.3 |
+
+The whole-cycle times of the primary sit later than the window times by about 26 s on sector 30 at both cadences and 31 s on sector 4, and the secondary by 7 s and -7 s. The offset is the same at 120 s and 600 s. A single shift for both minima is a compromise between them, so a difference of about 19 s between the primary and the secondary window times on sector 30 would show as a shared offset. That reading was not tested. The figures of the whole-cycle summary and of the per-cycle fits were looked at only for the sector 30 primary at 120 s, where the O-C is within about ±10 s with a slow wave of about 5 s.
+
+### Protocol of the borrowed template for a real light curve (2026-11-09)
+
+Code: `examples/nsv807_borrow.py`. It calls `eb.fit_borrowed` (`src/mikulasek_eb/borrow.py`) and then `run_time` of `examples/nsv807_timing.py`.
+
+1. Decided: the reference is the chosen solution of the tiered fit of the 120 s light curve of sector 30. The target is sector 4 (1800 s), with all points and its own file errors.
+2. Package: the borrowed values are fixed. The target keeps its own data layer: the baseline order and the gap split of its own tiered fit, and its own exposure (1440 s).
+3. Decided: the epoch is always fitted. The variants differ by the parameter groups that are also free: none, depths, widths, depths and widths, and depths, widths and harmonics.
+4. Decided: no variant is selected in the protocol. All variants are timed with the window timing of this section "Protocol of the timing", with the multiples 3.0 D (primary) and 3.2 D (secondary), D being the D of the variant.
+
+### Results of the borrowed template on NSV 807, sector 4 (2026-11-09)
+
+Reference sector 30 at 120 s, target sector 4 at 1800 s. Tables: `results/nsv807/s4_protocol/borrow/fits.csv` and `borrow/<variant>/timing/eclipses.csv`.
+
+| Variant (free besides the epoch) | rms (mmag) | Timed primary / secondary | Median sigma primary / secondary (s) |
+|---|---|---|---|
+| none | 28.7 | 62 / 60 | 209 / 212 |
+| widths | 24.7 | 62 / 60 | 221 / 182 |
+| depths | 13.9 | 62 / 60 | 30 / 59 |
+| depths, widths | 12.6 | 62 / 60 | 13 / 26 |
+| depths, widths, harmonics | 8.5 | 62 / 60 | 7.1 / 7.9 |
+| tiered fit of sector 4 itself | 8.5 | 62 / 60 | 6.3 / 7.7 |
+
+Conclusions the data support. With the harmonics fixed to the 2020 values the template does not fit the 2018 light curve, and the formal sigma is 4 to 30 times larger. With the harmonics free the borrowed template reaches the rms, the timed counts and the formal sigma of the tiered fit of sector 4 itself. On this star and this sector borrowing gave no gain over the direct fit. What is not shown: whether the borrowed times agree with the direct times eclipse by eclipse, and their real scatter. The harmonics variant used 993 points, not 1025, through the clipping of the stored data layer. That was not examined.
+
+### Protocol of the MAVKA timing of NSV 807 (locked, 2026-11-09)
+
+Status: rules for the request in `agent_mailroom/LC_Modeller_to_Mavka_user_nsv807.md`. The methods are AP, WSAP and WSL.
+
+1. Decided: the four light curves of NSV 807 (sector 30 at 120 s and 600 s, sector 4 at 1800 s, sector 97 at 200 s), SAP flux, as delivered. The period of the file is held fixed. The epoch of the file is not used to find minima.
+2. Decided: the minima are found by the MAVKA fit itself, from the data. Numbering and the primary or secondary label are assigned afterwards by matching to the times of the other method.
+3. Decided: the scan is run on the 120 s file by the same rules as in the Mikulášek protocol: one fixed set of eclipses chosen at the widest window, the rms of O-C about a straight line fitted to the same times, and the narrowest window within rms/sqrt(2(N-1)) of the best. The grid is D-dependent: the step is D/10 of the Mikulášek D of that kind (0.048450 primary, 0.049041 secondary, in cycles). W UMa is a contact star with no continuum, so the scan runs to 0.25 cycles, as for G5 and G6. The half-width is in cycles, one value per method and per kind. At the other cadences it is the same number in cycles, with no widening.
+6. Decided: MAVKA times each minimum separately in its window. There is no whole-cycle timing for MAVKA. One primary and one secondary anchor time per sector are given for labelling, and the period of the file places the rest.
+4. Decided: the point rule, the clean-up of outliers and the rejections are those of MAVKA, and each is written in the reply. They are not harmonised with the Mikulášek rules. Where the methods are compared it is on the eclipses that both timed.
+5. Decided: a failed fit keeps its row with an empty time and the reason. Output as `.dat` files, one per method and kind (`jd  err_days  flag`), a scan figure, a figure of every fit, and the table.
+
+### MAVKA timing of NSV 807 as it was performed (2026-11-09)
+
+Reply: `agent_mailroom/Mavka_user_to_LC_Modeller_nsv807_cleaned.md`. Products: `/home/voz/projects/UPJS/Mavka_user_folder/output/nsv807_cleaned/`. A first run on the uncleaned files (`Mavka_user_to_LC_Modeller_nsv807.md`, `output/nsv807/`) was discarded, because sector 97 holds many outliers. It was not rewritten.
+
+**Data.** Sectors 30 (120 s and 600 s) and 97 are the cleaned files of `results/nsv807/cleaned/` (the outlier step of the tiered-fit protocol: 97, 45 and 892 points removed). Sector 4 is the original file, 1025 points, because the outlier step cannot run on it. The fit is on the SAP flux with no weights. In sector 97, 1163 rows with non-finite SAP are left out, so 20909 values were fitted. The period of the file is held fixed and the epoch of the file is not used. Cycle 0 is the anchor of each kind that was given in the request.
+
+**Departures from the request.**
+1. The scan was run for AP and WSAP only, on the cleaned 120 s curve. WSL was not scanned. Its half-width is the WSAP half-width, and on the 120 s file its centres are the WSAP centres. This is written in `scan/chosen.txt`.
+2. A window with fewer than 6 points was widened by one cadence in phase until it held 6, or until the two half-widths would add to more than 0.5. This is the choice of MAVKA, and such times are flagged `extended`. We did not ask for the widening and said the half-width is not widened.
+
+**Windows.** Chosen on the 120 s file, in cycles, carried to the other files unchanged. They equal the numbers of the uncleaned curve.
+
+| Method | Primary (D) | Secondary (D) | Set, primary / secondary |
+|---|---|---|---|
+| AP | 0.067830 (1.4) | 0.058848 (1.2) | 66 / 62 |
+| WSAP | 0.053295 (1.1) | 0.044136 (0.9) | 65 / 62 |
+| WSL | 0.053295 (borrowed) | 0.044136 (borrowed) | none |
+
+**Times accepted** (primary / secondary):
+
+| Light curve | AP | WSAP | WSL |
+|---|---|---|---|
+| Sector 30, 120 s | 77 / 76 | 77 / 78 | none |
+| Sector 30, 600 s | 78 / 77 | 78 / 77 | none |
+| Sector 4, 1800 s | 52 / 49 | 65 / 65 | 8 / 13 |
+| Sector 97, 200 s | 149 / 145 | 151 / 150 | 146 / 146 |
+
+WSL gives no time on sector 30, because the formal sigma is not finite at every window that holds 6 points. Windows were extended in 13 fits per method on sector 30 at 120 s, and in 36 (AP), 150 (WSAP and WSL) at 600 s. At 1800 s they were extended in 157 fits per method, and at 200 s in 40 per method. On sector 4 some extended AP times have a formal sigma of days to years. The largest such case is secondary E=57, with a sigma of about 8e4 days. The labels agree with depth: the median SAP at the minimum is lower for the primary. The timings were not compared with the Mikulášek times.
+
+### Collected timings of NSV 807 (2026-11-09)
+
+All `.dat` files of all methods are in `results/nsv807/timing_dat/` (50 files and `index.csv`), written by `examples/nsv807_collect_dat.py`, which only copies. The file names are `NSV807_<light curve>_<method>_<kind>.dat`. The methods are the Mikulášek window timing, the Mikulášek whole-cycle timing, the borrowed sector 4 variants (five) and MAVKA AP, WSAP and WSL. Every header line starts with `#` and names the star, the file, the minimum, the method, the window, the cleaning and the columns. A row without a time (MAVKA rejections) is written as a `#` line with its reason, so every remaining line is data: `jd  err_days  flag`.
+
+### Protocol for V1383 Tau (locked, 2026-11-10)
+
+Status: locked on 2026-11-10. Method only. Results go in separate sections. The star is V1383 Tau (TIC 388995726), a contact binary with a strong O'Connell effect. The protocols of NSV 807 apply, with the changes below.
+
+Files, in `lc_shipper/data/V1383_Tau/`: sectors 42, 43, 44 (TESS-SPOC, 600 s) and sectors 70, 71 (TESS-SPOC, 200 s). Period of the file 0.35064 d.
+
+**Mikulášek, changes against the NSV 807 protocols.**
+1. Decided: SAP flux. The files have a real SAP error column, so there is no constant-sigma pilot.
+2. Decided: every sector is fitted on its own. Sectors are not combined, because the level of the maxima and the depth of the primary differ between sectors.
+3. Decided: the outlier step is the locked rule (400 phase bins, 5 sigma, local MAD, removed once, file period only, phase zero at `t.min()`), with the picture of the flagged points. If a sector has fewer than 5 points per bin the step stops and the case is reported.
+4. Decided: the baseline is one polynomial per segment with a shared template, split at gaps longer than 0.3 d. (For NSV 807 the split was 0.5 d.)
+5. Decided: the tiered search and the exposure rule are as locked. No second component is forced.
+6. Decided: window timing only, with the timing rules of NSV 807 (at least 4 points, at least 2 on each side, flags kept, no ladder). There is no whole-cycle timing, because of the O'Connell effect. There is no template borrowing, because the cadences are sufficient.
+7. Decided: the O-C scan is run once, on sector 70 (200 s), under the scan rules of NSV 807. The adopted window is carried to the other sectors as the same multiple of D, with the D of that sector's own solution.
+8. Package: O-C between sectors uses the fitted ephemeris, not the five-digit file period.
+9. Decided (2026-11-10, added after the sector 44 scan): a window is adopted only if it times the whole fixed set. Windows that time fewer eclipses of the set are not compared, because an rms over a few eclipses is not comparable with one over the whole set. This amends rule 4 of the scan rules of the timing protocol for this star. `nsv807_timing.py adopt` applies it to a saved scan.
+10. Decided (2026-11-10): on a light curve of lower cadence only windows of at least the multiple adopted on the higher-cadence light curve are considered, and the adoption rule is applied among them (the narrowest within rms/sqrt(2(N-1)) of the best of those). A scan at lower cadence can therefore only widen the window. `nsv807_timing.py adopt --start-over-d PRIMARY SECONDARY` applies it.
+
+**MAVKA (AP, WSAP, WSL).**
+1. Decided: MAVKA receives the cleaned files (the points removed by item 3 above, with the lists of removed points), from the start.
+2. Decided: the main scan is run on sector 70 (200 s) for all three methods, under the scan rules of the NSV 807 request: the step is D/10 of the Mikulášek D of that kind, up to 0.25 cycles, one fixed set of eclipses, the rms of O-C about a straight line, and the narrowest window within rms/sqrt(2(N-1)) of the best. The half-width in cycles is carried to the other sectors unchanged.
+3. Decided: a second scan experiment, WSAP only, on sector 44 (600 s), with the same rules. It is labelled as a second experiment. Its purpose is to test the window carried from 200 s against a window chosen at 600 s.
+4. Decided: MAVKA may widen a window that holds fewer than his minimum number of points. Every time obtained on a widened window is flagged `extended`, and the half-width actually used is written with it.
+5. Decided: one primary and one secondary anchor time per sector are given for labelling. The period of the file places the rest. The file epoch is not used.
+6. Decided: outputs are `.dat` files with `#` header lines and `#` lines for rows without a time, the tables, the scan figures and a figure of every fit.
+
+### Protocol of the cleaning of V1383 Tau (2026-11-10)
+
+Two cleaning rules exist for this star. Neither replaces the other. Both write a removed-point list, a folded figure, a time figure with the SAP background below it on the same time axis, and the original VOTable without the removed points (`examples/nsv807_cleaned_files.py`, `clean_one`).
+
+1. Folded-curve rule, `examples/v1383_clean.py`. It is the outlier step of the locked tiered-fit protocol (5 sigma from the median of the phase bin, local MAD, removed once, file period only). The number of bins is 400 for the 200 s files and 200 for the 600 s files, because the 600 s files do not fill 400 bins evenly (see the results). Output in `results/v1383_tau/cleaned/`.
+2. Background rule, `examples/v1383_clean_background.py`. A point is removed when `sap_bkg / median(sap_bkg)` of its file exceeds a ratio, default 10. It does not look at the magnitude. It is an option for the scattered-light episodes, not a rule for every case. Output in `results/v1383_tau/cleaned_bkg/`.
+3. Diagnostic, `examples/v1383_bkg_diagnostic.py`: the residual from the bin median of the folded curve against `sap_bkg / median`, with the robust scatter in ratio bins. Nothing is removed. Figure `results/v1383_tau/bkg_ratio_diagnostic.png`.
+
+### Results of the cleaning of V1383 Tau (2026-11-10)
+
+Files: sectors 42, 43, 44 (600 s) and 70, 71 (200 s), SAP flux.
+
+**Bins of the folded-curve rule.** At 400 bins the three 600 s files have bins with 1 to 3 points, because the cadence (0.0198 cycles) is much longer than the bin (0.0025 cycles). The step stopped. At 200 bins the smallest bin holds 9 to 11 points. The 200 s files have at least 23 points per bin at 400 bins.
+
+**Folded-curve rule, removed points.**
+
+| Sector | Cadence | Removed | Left |
+|---|---|---|---|
+| 42 | 600 s | 13 of 3440 | 3427 |
+| 43 | 600 s | 8 of 3327 | 3319 |
+| 44 | 600 s | 18 of 3248 | 3230 |
+| 70 | 200 s | 68 of 10539 | 10471 |
+| 71 | 200 s | 107 of 10596 | 10489 |
+
+In time (sectors 70, 71 and 44 were looked at, sectors 42 and 43 were not), almost all removed points of the 200 s files lie in short stretches at the starts and ends of orbits, where the SAP background is 100000 to 750000 e/s against about 1100 to 1600 in quiet stretches. Sector 44 has isolated removed points at quiet background, a few on the steep wall. In sector 71 the points kept around days 13 to 14.4, where the background stays at tens of thousands, scatter widely, so the rule left part of that episode in the file. Whether any removed point is a real point of the minimum was not decided from these pictures.
+
+**Background in sigma, rejected.** Removing points more than 5 robust sigma above the median background removed 6 to 23 percent of each file (778, 246, 210, 1545 and 2240 points), including whole stretches where the background is only some tens to hundreds of e/s above quiet. The quiet background is stable (sigma 39 to 59 e/s in four of five files), so any multiple of it is far below a level that harms the photometry. This version is not kept.
+
+**Residual against the background ratio** (robust sigma of the residual in mmag):
+
+| Sector | Quiet (ratio near 1) | Behaviour at larger ratio |
+|---|---|---|
+| 42, 43, 44 (600 s) | 4 to 5 | 4 to 7 up to ratio 30 |
+| 70 (200 s) | 6 to 7 | 9 to 14 from ratio 1.5 to 2; 19 above 30; 95 above 100 |
+| 71 (200 s) | 4 to 6 | 8 at 5 to 10; 10 at 10 to 30; 12 at 30 to 100; 48 above 100 |
+
+The residual is taken from the bin median, so it includes real changes of the curve between cycles and the bad points themselves. The rise of the scatter is a hint, not proof, that the points are bad. The 600 s files show no rise within the range they cover. Sector 71 has a stripe of about 600 points near a ratio of 17.
+
+**Background rule at ratio 10.**
+
+| Sector | Cadence | Removed | Cut (e/s) |
+|---|---|---|---|
+| 42 | 600 s | 161 of 3440 | 16198 |
+| 43 | 600 s | 40 of 3327 | 14406 |
+| 44 | 600 s | 67 of 3248 | 14162 |
+| 70 | 200 s | 335 of 10539 | 10996 |
+| 71 | 200 s | 793 of 10596 | 12317 |
+
+The ratio of 10 removes more than the folded-curve rule on every file, 3 to 8 percent of the 200 s files. On the 600 s files the diagnostic shows no need for a cut, yet the cut removes 40 to 161 points, among them the sector 44 rise to 47000 e/s where the magnitudes looked normal. The new pictures at ratio 10 and the stripe in sector 71 were not looked at.
+
+### Tiered fit of V1383 Tau on the background-cleaned files (2026-11-10)
+
+Method. The files are those of `results/v1383_tau/cleaned_bkg/` (background rule, ratio 10), chosen by the researcher. The protocol of "Protocol for V1383 Tau (locked, 2026-11-10)" applies: SAP flux, real errors, each sector on its own, tiered search of `examples/nsv807_s30_tiered.py` with `--skip-outliers` (the files are already cleaned) and `--gap-days 0.3`. The option `--gap-days` was added to that script. It passes the value to `FeatureSettings`, and the default is the package value of 0.5 d. The runs are in `results/v1383_tau/<sector>_fit_bkg/`, one folder per sector.
+
+Results.
+
+| Sector | Cadence | Points | Chosen | rms (mmag) | Baseline pieces | Exposure integrated (s) |
+|---|---|---|---|---|---|---|
+| 42 | 600 s | 3279 | p1_h123_b0 | 5.26 | 4 | 480 |
+| 43 | 600 s | 3287 | p1_h123_b1 | 5.30 | 3 | 480 |
+| 44 | 600 s | 3181 | p1_h123_b1 | 5.94 | 3 | 480 |
+| 70 | 200 s | 10204 | p1_h123_b0_C | 7.77 | 2 | 160 |
+| 71 | 200 s | 9803 | p1_h123_b0 | 7.74 | 2 | 160 |
+
+All fits have status ok. Every search stopped after two steps that gained less than the decisive BIC difference, with profile 1 and the harmonic set 1, 2, 3. On sector 70 the free-C variant was chosen. The two-component trial was tried on sectors 70 and 71 and rejected (rms gain below 0.25). Sectors 42, 43 and 44 report a rank-deficient Jacobian (rank 12 of 14 on 42 and 43, 10 of 11 on 44), so their parameter errors are not reliable. The rms is 5 to 8 mmag against a formal photometric error of about 1.7 mmag at 600 s and 2.6 mmag at 200 s. The folded picture of sector 70 follows both minima and the O'Connell difference of the maxima. The residuals are structured, with an amplitude of about 10 mmag, repeating over the phase. That structure was not analysed. The figures of the other sectors were not looked at.
+
+### O-C scan of V1383 Tau, sector 70 (2026-11-10)
+
+Method: the scan rules of "Protocol of the timing for a real light curve" (`examples/nsv807_timing.py scan`), on the background-cleaned file of sector 70 (200 s) and its saved solution `p1_h123_b0_C`. Output in `results/v1383_tau/s70_fit_bkg/timing_scan/`: the scan tables, `adopted.csv` and `rms_vs_half_width.png`.
+
+Results.
+
+| Kind | D (cycles) | Adopted half-window | Set N | rms of O-C at the adopted window (s) | Best rms (s) |
+|---|---|---|---|---|---|
+| primary | 0.04615 | 0.1523 cycles = 3.3 D | 64 | 6.96 | 6.40 |
+| secondary | 0.05589 | 0.2068 cycles = 3.7 D | 67 | 17.50 | 16.13 |
+
+The primary rms falls steeply up to about 2 D and then slowly, from 15 s at 1.5 D to 6.4 s at 4 D. The secondary rms is larger at every window and falls from 40 s at 1.4 D to 16 s at 4 D. The secondary scan ends at 4.4 D because the cap of 0.25 cycles is reached. Below about 1 D (secondary) and 0.8 D (primary) no eclipse could be timed. The rms of O-C over the formal sigma is between 0.5 and 1.2 for the primary and between 0.5 and 0.8 for the secondary beyond 1 D, so the formal errors are not smaller than the scatter. The reason for the larger scatter of the secondary was not investigated.
+
+### Window timing of V1383 Tau at the adopted windows (2026-11-10)
+
+Method: `examples/nsv807_timing.py time` with the multiples of the sector 70 scan, 3.3 D (primary) and 3.7 D (secondary), each sector with its own D, on the background-cleaned files and the saved solutions of `<sector>_fit_bkg`. The timing rules are those of "Protocol of the timing for a real light curve". Output in `results/v1383_tau/<sector>_fit_bkg/timing/`: `eclipses.csv`, the two `.dat` files, a summary figure per kind and a figure of every timed eclipse.
+
+Results (timed eclipses, median formal sigma, median number of points in the window, eclipses without a time and their reason):
+
+| Sector | Cadence | Primary: timed, sigma (s), points | Secondary: timed, sigma (s), points | Not timed |
+|---|---|---|---|---|
+| 42 | 600 s | 68, 9.2, 16 | 65, 38.9, 17 | 1 secondary (one side uncovered) |
+| 43 | 600 s | 66, 10.6, 15 | 64, 26.0, 17 | 1 primary (too few points), 1 secondary (one side uncovered) |
+| 44 | 600 s | 64, 9.1, 15 | 63, 27.8, 17 | 2 primary (one side uncovered) |
+| 70 | 200 s | 68, 6.6, 46 | 67, 22.1, 63 | 1 primary, 1 secondary (one side uncovered) |
+| 71 | 200 s | 65, 6.5, 47 | 64, 24.3, 48 | 2 primary, 1 secondary (one side uncovered) |
+
+The half-window is 0.152 to 0.154 cycles for the primary in all sectors. For the secondary it is 0.207 cycles on sector 70, 0.159 on sector 71 and 0.167 to 0.168 on the 600 s sectors, because D is the D of each sector's own solution. The gap flag is set on 0 to 5 timed eclipses of each kind and the wall check is false on at most 3. The secondary sigma is three to four times the primary sigma. The O-C figure of the sector 70 secondary shows no trend, with scatter of about 15 to 20 s and one time about 70 s late near JD 2460222. The residuals of the template in that window show a repeating pattern of about ±5 mmag. Only the sector 70 secondary figure was looked at. The 600 s files have about 16 points in a window, so their sigma should be read with the same doubts as for sector 4 of NSV 807. The scatter of the real times was not compared with the formal sigma, and the timings of the sectors were not compared with each other.
+
+### O-C scan of V1383 Tau, sector 44 (600 s) with Mikulášek (2026-11-10)
+
+Method: as for sector 70, on the 600 s file of sector 44 and its saved solution `p1_h123_b1`. It is a second scan experiment. Its windows were not used for the timing above. Output in `results/v1383_tau/s44_fit_bkg/timing_scan/`.
+
+Results. The fixed set holds 57 primary and 61 secondary eclipses. The scan took about 12 minutes.
+
+| Kind | D (cycles) | Adopted by the rule | rms (s) | N used by the rule |
+|---|---|---|---|---|
+| primary | 0.04663 | 0.0699 cycles = 1.5 D | 9.45 | 4 |
+| secondary | 0.04526 | 0.1901 cycles = 4.2 D | 19.5 | 61 |
+
+The secondary rms falls from 59 s at 1.9 D to 18 s at 5.5 D, and rms/sigma is 0.65 to 0.95 beyond 3 D. The primary adoption is an artefact of the rule. At 1.5 D only 4 of the 57 eclipses of the set are timed (the others have fewer than 4 points or points on one side only), and the rms of 9.45 s is taken over those 4, so it is the smallest value on the scan. With 57 eclipses timed (from 1.9 D) the primary rms is 22 s at 1.9 D and 26 to 33 s above 2 D, falling slowly to 26 s at 4.9 D. The rule compares rms values taken over different numbers of eclipses. For sector 70 this did not matter, because the adopted window timed 64 eclipses. The rule was then amended (item 9 of the V1383 Tau protocol): only windows that time the whole set are compared. Applied to the saved scans without repeating them, it gives for sector 44 a primary window of 0.0886 cycles = 1.9 D (rms 22.2 s, N 57) and an unchanged secondary of 4.2 D. The sector 70 windows are unchanged (3.3 D and 3.7 D). The sector 44 primary rms of 22.2 s is the first window of the scan that times all 57 eclipses, and it is the lowest value of the full-set windows. Beyond it the rms is higher (26 to 33 s). The adopted 1.9 D is therefore at the edge where timing becomes possible, so the primary scan has no interior minimum at 600 s. This was not investigated further. The 1.9 D window was rejected as too narrow (the primary window at 200 s is 3.3 D). With rule 10 (windows from 3.3 D for the primary and 3.7 D for the secondary) the sector 44 windows are 3.6 D (0.1679 cycles, rms 27.1 s, best 25.4 s, N 57) for the primary and 4.2 D (0.1901 cycles, rms 19.5 s, N 61) for the secondary. Above 3.3 D the primary rms is flat, 25 to 29 s. The 600 s timings made before this rule used 3.3 D and 3.7 D. They are not yet repeated at these windows. The scan figure is `rms_vs_half_width.png` in that folder.
+
+### Window timing of the 600 s sectors of V1383 Tau at the windows of rule 10 (2026-11-10)
+
+Method: `nsv807_timing.py time` with 3.6 D (primary) and 4.2 D (secondary), the windows of sector 44 under rule 10, each sector with its own D, on sectors 42, 43 and 44. The output is in `timing_w36_42/` of each run folder. The earlier set in `timing/` (3.3 D and 3.7 D) was not rewritten and its files were checked unchanged.
+
+Results. The counts of timed eclipses are the same as in the first set (68 / 65, 66 / 64 and 64 / 63 for primary / secondary). The half-windows are 0.168 cycles (primary) and 0.189 to 0.190 cycles (secondary). The paired difference is new minus first set, on the eclipses timed in both:
+
+| Sector | Kind | Median sigma first / new (s) | Paired mean difference (s) | Scatter (s) | Largest absolute (s) |
+|---|---|---|---|---|---|
+| 42 | primary | 9.2 / 8.8 | +1.0 | 3.3 | 19 |
+| 42 | secondary | 38.9 / 37.8 | +8.9 | 10.5 | 32 |
+| 43 | primary | 10.6 / 10.1 | +3.2 | 2.6 | 9 |
+| 43 | secondary | 26.0 / 25.9 | +12.5 | 8.4 | 32 |
+| 44 | primary | 9.1 / 9.3 | +2.8 | 3.1 | 13 |
+| 44 | secondary | 27.8 / 27.0 | +12.0 | 6.9 | 29 |
+
+The wider windows change the formal sigma by less than 5 percent. The primary times move by 1 to 3 s on average. The secondary times move later by 9 to 12 s, with a scatter of 7 to 10 s, which is comparable to the secondary sigma. Which set is closer to the true minima is not known. The pictures of the new set were not looked at, and the `.dat` files of the new set are not yet collected.
+
+### Collected timings of V1383 Tau (2026-11-10)
+
+`results/v1383_tau/timing_dat/` holds the ten window-timing `.dat` files (five sectors, two kinds) and `index.csv`, written by `examples/v1383_collect_dat.py`. Names: `V1383Tau_<sector>_mikulasek_window_<kind>.dat`. Every header line starts with `#` and gives the star, file, minimum, method, window, cleaning, template, flags and columns. All other lines are data. MAVKA files are not yet included.
+
+### Request to MAVKA for V1383 Tau (2026-11-10)
+
+The request is `agent_mailroom/LC_Modeller_to_Mavka_user_v1383_tau.md`, with the reply expected in `Mavka_user_to_LC_Modeller_v1383_tau.md` and the products in `Mavka_user_folder/output/v1383_tau/`. It follows "Protocol for V1383 Tau" (MAVKA part) with these additions, which were decided after the protocol was locked:
+
+1. The files are the background-cleaned files (`results/v1383_tau/cleaned_bkg/`), given from the start.
+2. Scan 1 is on sector 70 for AP, WSAP and WSL: step D/10 of the Mikulášek D of that kind (0.04615 primary, 0.05589 secondary), up to 0.25 cycles. Only half-widths that time the whole fixed set take part in the choice (item 9 of the Mikulášek protocol, applied to MAVKA too).
+3. Scan 2 is on sector 44 for WSAP only (D 0.04663 primary, 0.04526 secondary), with the whole grid written. Only half-widths from the WSAP half-width of scan 1 upward are considered (item 10).
+4. WSAP is timed twice on the 600 s sectors, with the window of scan 1 and with the window of scan 2, and the two sets are labelled apart (`WSAP2`). AP and WSL use the window of scan 1.
+5. Widening is allowed and flagged `extended`. Anchors are one primary and one secondary JD per sector. The `.dat` files start with `#` comment lines.
+
+### First MAVKA run on V1383 Tau rejected (2026-11-10)
+
+The first reply (`Mavka_user_to_LC_Modeller_v1383_tau.md`, `output/v1383_tau/`) is not used. MAVKA placed the next window centre at the fitted time of the previous eclipse plus one period whenever that fit fell inside the window, and the scan was run at a half-width of 0.25 cycles. On sector 70 a WSAP fit that was 6828 s early (0.19 periods) moved the next centre, and WSAP stood on the maximum for cycles 54 to 62, with model fluxes of 2351 to 2374 ct/s against 1380 to 1390 ct/s at the minimum. AP and WSL did not follow it. The centres of the three methods were therefore not the same and the run does not compare the methods. The anchor plus n periods, with the period of the file, agrees with the Mikulášek fitted times to about 30 s typically, and to 226 s at most, over a sector. The window half-widths are 4000 to 7500 s. A new request (`LC_Modeller_to_Mavka_user_v1383_tau_centres.md`) asks for fixed centres `anchor + n x period` in every window, no centre taken from a fitted time, a rejection of a fit more than 0.1 period from its centre (`far_from_centre`), and a check table for sector 70 before the full run. The new products go to `output/v1383_tau_2/`.
+
+### WSL on V1383 Tau: all times rejected, request to keep them (2026-11-10)
+
+On the second run (`output/v1383_tau_2/`, note `Mavka_user_to_LC_Modeller_v1383_tau_2_note.md`) WSL gave no accepted time on any of the five files, at the windows of its own scan (0.152295 and 0.190026 cycles) and after a refit at the WSAP half-widths (0.050765 and 0.067068 cycles). Of 145 to 148 rows per file, 130 to 140 were rejected because the formal sigma was not finite and 8 to 13 because they held fewer than 6 points (one `maxfev` in sector 71). On NSV 807 sector 30 the same reason removed every WSL time. The request `LC_Modeller_to_Mavka_user_v1383_tau_wsl_sigma.md` asks for WSL again on all five files at the WSAP windows, with one new rule for V1383 Tau only: a converged fit whose formal sigma is not finite keeps its time, the error is written as `None` (the agreed way to say that the formal error is infinite), and the time is flagged `sigma_none`. The other rejections stay. The new run goes to `output/v1383_tau_2/WSL_sigma_none/`, and the earlier tables are kept. Such times have no usable formal error, so they cannot be weighted in a comparison and enter it only as times.
+
+### WSL on V1383 Tau with times kept at an infinite sigma (2026-11-10)
+
+Reply: `Mavka_user_to_LC_Modeller_v1383_tau_wsl_sigma.md`, products in `Mavka_user_folder/output/v1383_tau_2/WSL_sigma_none/`. WSL was run again on the five files at the WSAP half-widths (0.050765 primary, 0.067068 secondary), centres at anchor + n x period, with the rule that a converged fit with a non-finite formal sigma keeps its time, the error is `None` and the flag is `sigma_none` (`extended+sigma_none` on a widened window). The limit for `far_from_centre` was 0.1 period (3029.5 s).
+
+Counts (kept with error `None`, rejected): s42: 68, 6 (primary), 65, 9 (secondary); s43: 66, 7 and 64, 8; s44: 65, 7 and 63, 8; s70: 69, 5 and 67, 7; s71: 66, 7 and 64, 9. No WSL time has a finite sigma. Rejections are `far_from_centre` (1 to 5 per kind), fewer than 6 points (3 to 7), and one `maxfev` on s71. Time minus centre, computed from the saved tables with the anchors and the period of the file: for 53 to 69 of the kept times of each kind in sectors 42, 70 and 71 and for the primary of 43 and 44 the difference is under 100 s (median 19 to 50 s). The secondary of sector 43 has a median of 158 s with 62 of 64 times between 100 and 300 s, and the secondary of sector 44 has a median of 109 s, so the WSL secondary minima lie systematically 100 to 200 s from the anchor prediction in those sectors. The largest differences are +2836 s (s70 primary, cycle 36, `extended+sigma_none`, at the last point of a rising stretch), +432 s (s42 primary, cycle 30) and -330 s (s44 primary, cycle 32). The 0.1 period limit let the 2836 s time through, so that limit is too loose for a single time that is plainly not a minimum. These WSL times were not compared with the Mikulášek times.
+
+### Results of the MAVKA run on V1383 Tau and comparison of all methods (2026-11-10)
+
+Reply: `Mavka_user_to_LC_Modeller_v1383_tau_2.md`, products in `Mavka_user_folder/output/v1383_tau_2/`. All collected `.dat` files (52, Mikulášek first set, Mikulášek second set for 600 s, MAVKA AP, WSAP, WSAP2 and WSL with the `None` rule) are in `results/v1383_tau/timing_dat/`. The comparison, `examples/v1383_compare.py` (reads only those files), is in `results/v1383_tau/method_comparison.csv`.
+
+**What MAVKA did.** Centres at anchor + n x period, rejection of a time more than 3029.5 s from the centre (39 times, differences of 4250 to 282334 s, most on AP and WSAP at 600 s), widening to 6 points flagged `extended`. His scan 1 on sector 70 chose the same half-width for AP and WSAP, 0.050765 (1.1 D) and 0.067068 (1.2 D), and for WSL 0.152295 and 0.190026 (the WSL windows were replaced by the WSAP ones). His scan 2 on sector 44 (WSAP only, from the scan 1 half-width upward) chose 0.083934 (1.8 D, primary) and 0.085994 (1.9 D, secondary). The window of the Mikulášek timing is 3.3 D and 3.7 D (first set), and 3.6 D and 4.2 D (second set), so the MAVKA windows are about a third to a half of them. The sector 70 centre check gave at most 107 s between centre and the Mikulášek time. One accepted WSAP time (s70, primary, cycle 36) lies +2671 s from its centre on six points of a rising stretch, and the same cycle gives +2836 s in WSL. No WSL formal sigma is finite.
+
+**Numbers of times (primary / secondary), accepted.**
+
+| Sector | Mikulášek | AP | WSAP | WSL | WSAP2 |
+|---|---|---|---|---|---|
+| 42 | 68 / 65 | 68 / 64 | 65 / 64 | 68 / 65 | 68 / 64 |
+| 43 | 66 / 64 | 66 / 64 | 66 / 64 | 66 / 64 | 66 / 64 |
+| 44 | 64 / 63 | 65 / 63 | 64 / 62 | 65 / 63 | 65 / 63 |
+| 70 | 68 / 67 | 67 / 67 | 69 / 67 | 69 / 67 | |
+| 71 | 65 / 64 | 65 / 64 | 66 / 64 | 66 / 64 | |
+
+**Rms of O-C about an unweighted straight line (s), and the median of the time minus the Mikulášek first-set time on the common eclipses (s, MAD scatter in brackets).** The rms is not clipped, except where noted.
+
+| Sector | Kind | Mik. rms | AP rms, diff | WSAP rms, diff | WSL rms, diff |
+|---|---|---|---|---|---|
+| 42 | primary | 8.6 | 66, +7 (8) | 50, +15 (6) | 50, +17 (9) |
+| 42 | secondary | 35.6 | 35, -30 (23) | 39, -31 (28) | 40, -33 (28) |
+| 43 | primary | 6.5 | 8.2, +26 (9) | 7.7, +40 (12) | 8.5, +41 (11) |
+| 43 | secondary | 22.8 | 29.6, -116 (22) | 25.8, -117 (17) | 26.1, -117 (18) |
+| 44 | primary | 27.4 | 35.8, +34 (7) | 21.3, +45 (12) | 50.8, +46 (10) |
+| 44 | secondary | 23.3 | 42.2, -116 (34) | 27.4, -128 (26) | 26.0, -129 (24) |
+| 70 | primary | 6.9 | 8.1, +12 (8) | 316 (14.4 clipped), +13 (8) | 335 (7.6 clipped), +14 (8) |
+| 70 | secondary | 17.5 | 16.9, -25 (13) | 17.2, -22 (12) | 17.2, -22 (11) |
+| 71 | primary | 5.6 | 8.1, +6 (7) | 16.5, +7 (6) | 30.9, +7 (6) |
+| 71 | secondary | 22.7 | 30.3, +61 (25) | 25.0, +66 (21) | 24.8, +66 (24) |
+
+Median formal sigma of the secondary (s): Mikulášek 22 to 39, AP 23 to 41, WSAP 15.5 to 20, WSL none. For the primary: Mikulášek 6.5 to 10.6, AP 7.3 to 9.0, WSAP 5.1 to 9.8.
+
+**Conclusions the data support.**
+1. AP, WSAP and WSL agree with one another. Their times differ from each other by a few seconds on the common eclipses, and each differs from the Mikulášek time by the same amount. The difference is not random: the MAVKA primary times are later than the Mikulášek ones by 6 to 66 s, and the secondary times earlier by 22 to 144 s on sectors 42 to 70, but later by 61 to 66 s on sector 71. It is largest on the 600 s sectors 43 and 44 (secondary about -116 to -129 s, primary +26 to +46 s). The second WSAP set (wider window) moves the MAVKA times a further 8 to 16 s away from the Mikulášek ones. The three MAVKA methods are local fits of the bottom of the minimum, and the Mikulášek times follow a template over a wide window. The asymmetric minimum is the probable cause (this star has a strong O'Connell effect), but this was not tested. This difference of 100 s or more at 600 s is larger than any formal sigma, so absolute minimum times of the two kinds of method cannot be mixed in one O-C diagram. Which time is the true minimum is not decided by this comparison: there is no truth for this star.
+2. The scatter about a straight line is about the same for all methods in the secondary at 200 s (17 s) and the primary at 200 s (7 to 8 s for Mikulášek and AP, after removing one bad time for WSAP and WSL). At 600 s the Mikulášek times are smoother on sectors 42 (primary 8.6 s against 50 to 66 s) and 44 (secondary 23 s against 26 to 42 s), and MAVKA is smoother in the primary of sector 44 (WSAP 21 s against 27 s). On sector 42 the MAVKA primary scatter comes from times close to the data gap (cycle 30, +422 to +507 s from the centre, flagged `gap` and `edge`), where the Mikulášek times do not show it. The rms is not clipped, and a few bad times dominate several entries, so these numbers are rough.
+3. The MAVKA formal sigma of the secondary (WSAP 15 to 20 s) is below the scatter about the line (17 to 39 s) on every sector, so it is too small. For the Mikulášek secondary the sigma (22 to 39 s) is about the scatter (17.5 to 35.6 s). The WSL sigma is not finite for every time. It is a failure of the fit to provide an error.
+4. The windows are different: MAVKA at 1.1 D to 1.9 D, Mikulášek at 3.3 D to 4.2 D. The methods were run under their own conditions, as agreed. This comparison does not separate the effect of the window from the effect of the method.
+5. Both methods time the minimum in nearly every cycle. The numbers of times are within 1 to 4 of one another on every sector. A few bad times are accepted: s70 WSAP and WSL primary cycle 36 (+2671 s and +2836 s from the centre, on a gap) and several times on sector 42 near its gap. The rejection limit of 0.1 period is too loose for them.
+
+What is not shown: the cause of the systematic differences, the effect of the wider MAVKA windows on the offset beyond the WSAP2 test, the agreement with an independent time such as a spectroscopic ephemeris, the 200 s sectors 70 and 71 at the Mikulášek second-set windows, and the pictures of the individual fits (only the sector 70 secondary Mikulášek figure and the MAVKA folded figures were mentioned in the reports and none of the MAVKA figures was looked at).
+
+### Protocol for SV Cen (locked, 2026-11-10)
+
+Star SV Cen, TIC 324101484. Aim: see how the Mikulášek method deals with a fast period change, not to compare it with MAVKA (MAVKA is postponed). Expected rate about -2.1 s/yr, period about 1.658 d. Data: `lc_shipper/data/SV_Cen`, QLP SAP flux, sectors 10, 11 (1800 s), 37, 38 (600 s), 64, 100 (200 s), 99 (600 s), 2531 d in all. The SPOC file of sector 64 is ignored. About 16 cycles per sector, about 105 eclipses of each kind in all.
+
+1. Decided: no template borrowing between sectors and no whole-cycle timing. The shape changes between sectors (maxima differ by about 0.25 mag, a variable O'Connell effect), and the cadences differ.
+2. Decided: the cleaning is per sector. The background ratio rule only (ratio 10). There is no folded rule. Pictures with the outliers marked, folded and unfolded with the background, before anything is fitted.
+3. Decided: flux errors. The files have no `sap_flux_err`, and `kspsap_flux_err` is judged unrealistic. The sigma is taken from the residual of the fit, per sector.
+4. Decided: two kinds of fit.
+   - A. Sector-specific: the tiered fit of the locked protocol on each sector, with the timing of each eclipse. This gives the main results and the O-C.
+   - B. One template for all sectors: one shape, no tier search, with the period and a free `Pdot` fitted to all sectors together. The shape is fixed once, from fit A of sector 64. This fit runs second.
+5. Decided: timing is window timing with the rules of V1383 Tau (at least 4 points, at least 2 on each side, flags kept). The window scan is on sector 64 (200 s) with a straight-line reference per sector, and the adopted window is applied to the other sectors, with the rule for lower cadences (item 10 of V1383 Tau).
+6. Decided (2026-11-10): the window is locked in phase (cycles), not as a multiple of D. D is a width of the fitted profile, so the same multiple of D is a different fraction of the orbit for each minimum and each sector. On sector 64 the fit gives D1 = 0.0385 and D2 = 0.1239 cycles, and 1.6 D is 0.062 cycles for the primary but 0.198 cycles for the secondary. The locked half-width is that wider one: 0.198 cycles, taken from the sector 64 secondary at 1.6 D, and it is used for the primary and the secondary of every sector. The timings made at 1.6 D of each sector's own profile are not kept.
+6. Decided: the O-C of all sectors is first drawn about the straight line, then a quadratic is fitted to all the times. Primary and secondary are kept apart. The quadratic gives Pdot from the O-C.
+7. Decided: the local period of each sector from fit A is extracted and plotted against time, as an extra view.
+8. Decided: Pdot from the O-C (item 6), Pdot from the one-template fit (item 4B) and the slope of the local periods (item 7) are shown side by side. The cause of a difference is not concluded without a test. A variable O'Connell effect can shift the times and mimic or hide a period change.
+9. Result, not decided. The tiered search stopped at its first step on sector 64. That step fits only profile 1, and every profile 1 candidate ended with status ``bound-active`` (the secondary amplitude A2 at 8.8 against a bound of 4.0), so the search raised an error and never reached the profile step, which is where profiles 2, 3 and 4 are tried. The search was trapped by its own order of steps. A diagnostic run of profiles 1 to 4 on sector 64, outside the search, showed profile 3 as the only one where the fit finishes with status ``ok`` (rms 13.7 mmag). The option ``--start-profile`` was added to ``nsv807_s30_tiered.py`` and the search was rerun on sector 64 with profile 3 as the start. It chose ``p3_h123_b1``, status ``ok``, rms 13.72 mmag, and profiles 1 and 2 failed again in the profile step. The residuals still reach about 75 mmag at the walls of the primary and the template leaves structure. The constant sigma of that fit is 9.23 mmag, from the scatter about the phase-bin medians, because the pilot fit of the protocol also ended ``bound-active``. The ephemeris of this fit has ``Pdot`` fixed at 0. The other sectors are not fitted yet.
+10. Before the fits, the expected size is: quadratic O-C about 3 h across the span, inside one sector about 1 s, and a cycle count that is unambiguous across the gaps. These are estimates from the quoted rate, to be checked against the data.
+
+### Tiered fits of SV Cen, per sector (2026-11-10)
+
+Method. The files are `results/sv_cen/cleaned/` (folded-curve rule, 5 sigma, the three flagged points of sector 64 restored). The search is `examples/nsv807_s30_tiered.py` with `--skip-outliers`, `--no-flux-err`, `--sigma-from-bins` and `--start-profile`. The constant sigma is the robust scatter about the phase-bin medians, because the pilot fit of the protocol ends `bound-active` on these files. The number of bins is 400 at 200 s, 200 at 600 s and 70 at 1800 s. The start profile is 3, except sectors 99 and 100, where profiles 1, 2 and 3 all end `bound-active` at the first step and the search was rerun with start profile 4. `Pdot` is fixed at 0 in every fit. The figures were looked at for sectors 64, 99 and 100 only.
+
+| Sector | Cadence | Chosen | rms (mmag) | Sigma (mmag) | Baseline pieces | BIC gains | Stopped early |
+|---|---|---|---|---|---|---|---|
+| 10 | 1800 s | p3_h123_b0 | 17.69 | 22.68 | 1 |  | yes |
+| 11 | 1800 s | p3_h123_b1 | 15.46 | 30.73 | 1 |  | yes |
+| 37 | 600 s | p3_h2_b1 | 13.95 | 20.31 | 1 |  | no |
+| 38 | 600 s | p3_h123_b0 | 15.18 | 10.55 | 1 |  | yes |
+| 64 | 200 s | p3_h123_b1 | 13.72 | 9.23 | 1 | 5.7, 0.0 | yes |
+| 99 | 600 s | p4_h123_b1 | 10.45 | 16.03 | 2 | 632.7, 0.0, 0.0 | no |
+| 100 | 200 s | p4_h123_b0 | 13.06 | 10.95 | 1 | 0.0, 0.0 | yes |
+
+All chosen fits have status ok. On sectors 99 and 100 the other three profiles end `bound-active` (an amplitude of 3.4 to 17.9 against a bound of about 2.7). Sector 99 has a gap of about 2 days and two baseline pieces, and its baseline order 1 beats order 0 by 633 in BIC. Sector 100 keeps baseline order 0: order 1 has the lower rms (12.51 mmag) but a BIC gain of 6.2, below the decisive difference of 10. Sector 37 drops to the single harmonic 2. The residuals of sectors 64, 99 and 100 are waves of 20 to 75 mmag that repeat over the phase, so the template leaves structure. The figures of sectors 99 and 100 show a second component on the primary. The runs are in `results/sv_cen/s<sector>_fit/`, and `s99_fit_p4/` and `s100_fit_p4/` for the two that needed profile 4.
+
+### Window timing of SV Cen at the locked phase window (2026-11-10)
+
+The window is item 6 of "Protocol for SV Cen": one half-width of 0.19826 cycles for both minima of every sector. It is 1.6 times D2 of the sector 64 solution (`D2 = 0.12391` cycles). The earlier timing, made at 1.6 D of each sector's own profile, was deleted, including its figures and its `timing_dat`.
+
+Run from `mikulasek_eb`, with `MPLBACKEND=Agg`. `examples/nsv807_timing.py` was not changed. `examples/sv_cen_timing.py time` calls it. The script takes the window as a multiple of D, so the multiple passed for each minimum is `0.19826 / D` of that minimum, which makes the half-width 0.19826 cycles. `--bins` is the number used for that sector's fit. The cleaned file is `--file`.
+
+```bash
+python examples/sv_cen_timing.py time --run results/sv_cen/s10_fit \
+    --file results/sv_cen/cleaned/TIC324101484_s10_QLP_1800s.vot --bins 70 --half-over-d 5.300 1.621
+python examples/sv_cen_timing.py time --run results/sv_cen/s11_fit \
+    --file results/sv_cen/cleaned/TIC324101484_s11_QLP_1800s.vot --bins 70 --half-over-d 5.212 1.562
+python examples/sv_cen_timing.py time --run results/sv_cen/s37_fit \
+    --file results/sv_cen/cleaned/TIC324101484_s37_QLP_600s.vot --bins 200 --half-over-d 6.027 3.163
+python examples/sv_cen_timing.py time --run results/sv_cen/s38_fit \
+    --file results/sv_cen/cleaned/TIC324101484_s38_QLP_600s.vot --bins 200 --half-over-d 5.177 1.635
+python examples/sv_cen_timing.py time --run results/sv_cen/s64_fit \
+    --file results/sv_cen/cleaned/TIC324101484_s64_QLP_200s.vot --bins 400 --half-over-d 5.151 1.600
+python examples/sv_cen_timing.py time --run results/sv_cen/s99_fit_p4 \
+    --file results/sv_cen/cleaned/TIC324101484_s99_QLP_600s.vot --bins 200 --half-over-d 1.444 1.754
+python examples/sv_cen_timing.py time --run results/sv_cen/s100_fit_p4 \
+    --file results/sv_cen/cleaned/TIC324101484_s100_QLP_200s.vot --bins 400 --half-over-d 1.436 1.752
+```
+
+Every run reported a half-window of 0.19826 cycles for both minima. The output is `results/sv_cen/<run>/timing/`.
+
+`nsv807_timing.py` draws each eclipse with the phase measured from the fitted time. The cycle numbers of these files are counted from the file epoch, so that phase falls half a cycle off and the template is drawn on the other minimum. Those figures were deleted. `examples/sv_cen_redraw_s64.py` redrew all of them, evaluating the template with `mikulasek_eb.phase` at the saved M0 and P0, plus one constant offset. On the sector 64 primary the residual of that drawing stays within about 20 mmag. The other sectors' figures were redrawn and not looked at one by one.
+
+`examples/sv_cen_window_mark.py` draws the locked window on the folded curve of every sector and writes `windows_on_fold.png` in the fit folder. Both minima are shaded with the same phase width.
+
+`examples/sv_cen_collect_dat.py` writes `results/sv_cen/timing_dat/`: 14 `.dat` files and `index.csv`. Each header names the star, the sector, the minimum, the method, the locked window, the template, the cleaning and the sigma. A rejected eclipse is a `#` line. Every other line is `jd  err_days  flag`.
+
+| Sector | Primary timed | Secondary timed | Not timed | Median sigma, primary (s) | Median sigma, secondary (s) |
+|---|---|---|---|---|---|
+| 10 | 14 | 15 | 4 | 40.5 | 33.1 |
+| 11 | 15 | 15 | 4 | 42.7 | 33.5 |
+| 37 | 14 | 14 | 3 | 25.0 | 15.3 |
+| 38 | 15 | 16 | 1 | 21.9 | 18.9 |
+| 64 | 16 | 16 | 1 | 12.5 | 11.4 |
+| 99 | 13 | 12 | 1 | 18.8 | 12.3 |
+| 100 | 16 | 16 | 0 | 17.8 | 14.3 |
+
+The eclipses without a time are at the ends of a sector, where one side of the window is not covered. The O-C over all sectors and the quadratic fit are not done yet.
+
 ### Timing window on NSV 807
 
 Sectors 30 and 97. Wider windows (0.35 and 0.5) shrink the formal sigma and increase the real O-C scatter. rms(O-C/sigma) rises to 1.4 to 2.1. Window 0.15 has the smallest scatter. Window 0.25 has about honest errors. The window is reported with every timing. The NSV 807 window is not the window of the detached spot experiment. That experiment uses a half-width of 0.12 cycles.

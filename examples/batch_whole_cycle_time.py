@@ -50,30 +50,44 @@ STARS = ["G1", "G2", "G4", "G5", "G6", "G7", "G8"]
 CADENCES = [120, 600, 1800]
 
 
-def time_file(row: dict, order: int = 1) -> tuple[list[dict], list[dict]]:
-    """Time one file, one shift per cycle.
+def time_cycles(
+    t_mjd,
+    mag,
+    sig,
+    solution,
+    epoch: float,
+    period: float,
+    order: int,
+    min_points: int,
+    min_side: int,
+    label: str,
+) -> tuple[list[dict], dict, dict]:
+    """Time every orbital cycle of one light curve with one shift of the template.
 
     Args:
-        row (dict): Manifest row.
-        order (int): Degree of the straight-line-or-higher baseline fitted to each cycle.
+        t_mjd (ndarray): Times, MJD.
+        mag (ndarray): Magnitudes.
+        sig (ndarray): Magnitude errors.
+        solution (ModelSolution): The template and its fitted ephemeris.
+        epoch (float): File epoch, JD, for the O-C column only.
+        period (float): File period, days, for the O-C column only.
+        order (int): Degree of the baseline fitted to each cycle.
+        min_points (int): Fewest points in a cycle.
+        min_side (int): Fewest points on each side of the cycle centre.
+        label (str): Light-curve name, for the log.
 
     Returns:
-        tuple[list[dict], list[dict]]: One summary row per eclipse kind, and one
-        row per eclipse. A cycle that fails keeps two eclipse rows with the reason.
+        tuple[list[dict], dict, dict]: One row per eclipse (two per cycle, a cycle
+        that fails keeps two rows with the reason), the measured times by kind,
+        and the fitted shift of each timed cycle (days) by cycle number.
     """
-    curve = GENERATED / row["path"]
-    solution, name = chosen_solution(curve)
-    payload = eb.load_tess_votable(curve)
-    t_mjd = eb.absolute_jd_to_mjd(np.asarray(payload["t"], float))
-    mag = np.asarray(payload["mag"], float)
-    sig = np.asarray(payload["sig"], float)
-    epoch, period = float(payload["epoch_jd"]), float(payload["period"])
     ephem = solution.ephem
     model = solution.build_model()
     phase = eb.phase(t_mjd, ephem["M0"], ephem["P0"], ephem.get("Pdot", 0.0))
     n_min = int(np.floor(float(np.min(phase)) + 0.25))
     n_max = int(np.floor(float(np.max(phase)) + 0.25 - 1e-9))
     measured = {"primary": [], "secondary": []}
+    deltas = {}
     points = []
     for n in range(n_min, n_max + 1):
         centre = n + 0.25
@@ -83,9 +97,9 @@ def time_file(row: dict, order: int = 1) -> tuple[list[dict], list[dict]]:
         n_before = int(np.sum(offset[inside] < 0))
         n_after = n_in - n_before
         reason = ""
-        if n_in < MIN_POINTS:
+        if n_in < min_points:
             reason = "too_few_points"
-        elif n_before < MIN_SIDE or n_after < MIN_SIDE:
+        elif n_before < min_side or n_after < min_side:
             reason = "one_side_uncovered"
         delta = sigma = None
         if not reason:
@@ -105,10 +119,10 @@ def time_file(row: dict, order: int = 1) -> tuple[list[dict], list[dict]]:
                 delta, sigma = fit.delta, fit.sigma
             except Exception as exc:
                 reason = f"fit_failed: {type(exc).__name__}"
-                logger.warning("%s cycle %s: %s", curve.name, n, reason)
+                logger.warning("%s cycle %s: %s", label, n, reason)
         for kind, eclipse in (("primary", float(n)), ("secondary", n + 0.5)):
             record = {
-                "file": curve.name,
+                "file": label,
                 "kind": kind,
                 "cycle": f"{eclipse:.1f}",
                 "T_jd": "",
@@ -129,7 +143,41 @@ def time_file(row: dict, order: int = 1) -> tuple[list[dict], list[dict]]:
                     oc_file_s=f"{oc_s:.3f}",
                 )
                 measured[kind].append(t_jd)
+                deltas[n] = float(delta)
             points.append(record)
+    return points, measured, deltas
+
+
+def time_file(row: dict, order: int = 1) -> tuple[list[dict], list[dict]]:
+    """Time one file, one shift per cycle.
+
+    Args:
+        row (dict): Manifest row.
+        order (int): Degree of the straight-line-or-higher baseline fitted to each cycle.
+
+    Returns:
+        tuple[list[dict], list[dict]]: One summary row per eclipse kind, and one
+        row per eclipse. A cycle that fails keeps two eclipse rows with the reason.
+    """
+    curve = GENERATED / row["path"]
+    solution, name = chosen_solution(curve)
+    payload = eb.load_tess_votable(curve)
+    t_mjd = eb.absolute_jd_to_mjd(np.asarray(payload["t"], float))
+    mag = np.asarray(payload["mag"], float)
+    sig = np.asarray(payload["sig"], float)
+    epoch, period = float(payload["epoch_jd"]), float(payload["period"])
+    points, measured, _ = time_cycles(
+        t_mjd,
+        mag,
+        sig,
+        solution,
+        epoch,
+        period,
+        order,
+        MIN_POINTS,
+        MIN_SIDE,
+        curve.name,
+    )
     summary = []
     for kind in ("primary", "secondary"):
         times = measured[kind]
