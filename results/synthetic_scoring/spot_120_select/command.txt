@@ -1,1 +1,0 @@
-examples/spot_120_select.py

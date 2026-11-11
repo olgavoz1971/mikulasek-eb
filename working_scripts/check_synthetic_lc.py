@@ -15,7 +15,7 @@ import logging
 import sys
 from pathlib import Path
 
-from mikulasek_eb.synthetic_check import (
+from mikulasek_eb_tess.synthetic_check import (
     FAIL,
     check_synthetic,
     load_synthetic,

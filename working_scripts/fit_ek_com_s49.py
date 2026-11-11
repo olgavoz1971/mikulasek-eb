@@ -43,9 +43,9 @@ from astropy.time import Time
 _ROOT = Path(__file__).resolve().parent.parent
 
 from mikulasek_eb.helpers import absolute_jd_to_mjd, predicted_magnitude
-from mikulasek_eb.io import load_tess_votable
+from mikulasek_eb_tess.io import load_tess_votable
 from mikulasek_eb.api import solution_from_pipeline
-from mikulasek_eb.features import extract_features
+from mikulasek_eb_tess import extract_features
 from mikulasek_eb.pipeline import FitConfig, run_staged_fit
 from mikulasek_eb.plotting import plot_global_fit
 from mikulasek_eb.tom import (

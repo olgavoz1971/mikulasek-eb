@@ -1,4 +1,9 @@
-# API reference (mikulasek_eb.py, eb_tuning.py)
+# API reference
+
+Import locations. The root `mikulasek_eb` exports only the everyday surface (`fit`, `time`, `validate_lightcurve`, `fit_borrowed`, `run_staged_fit`, `FitOutput`, `TimingOutput`, `ModelSolution`, `FitPipelineResult`, `ParameterPlan`, `Config`, `ModelSpec`, `DataSetup`, `FitConfig`, `FitPolicy`, `TimingRecipe`, `EBModel`, `PROFILES`, `phase`, `mjd_to_jd`, `absolute_jd_to_mjd` and the errors). The functions below come from their own modules: `model`, `fitting`, `timing`, `tuning`, `tom`, `extensions`, `exposure`, `validity`, `borrow`, `helpers`.
+Selection (survey-neutral, settings are arguments): `mikulasek_eb.selection` has `extract_features`, `review_features`, `propose_candidates`, `select_model`, `tiered_search`, `make_candidate`, `FeatureSettings`, `RuleSettings`, `Candidate`, `SelectionResult`, `TieredResult`. TESS adapter with calibrated settings: `mikulasek_eb_tess`.
+
+The signatures below are for the engine.
 
 ## EBModel(profile=1, harmonics=(2,), ocon=False)
 Callable `model(theta, p) -> mag`. Parameter dict keys: `A1 A2 D1 G1 C1` (+ optional `D2 G2 C2`; absent means equal to D1,G1,C1), `H<k>` for every k in `harmonics` (term cos(2πkϑ)), `S1` if `ocon` (sin 2πϑ). All keys needed by the model must be present in the dict, free or not. `model.names(shared_shape=True)` lists them.

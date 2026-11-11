@@ -34,15 +34,11 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 
-from mikulasek_eb import (
-    EBModel,
-    fit_global,
-    initial_guess,
-    noise_floor,
-    out_of_eclipse_mask,
-)
+from mikulasek_eb import EBModel
+from mikulasek_eb.fitting import fit_global
+from mikulasek_eb.tuning import initial_guess, noise_floor, out_of_eclipse_mask
 from mikulasek_eb.helpers import absolute_jd_to_mjd, predicted_magnitude
-from mikulasek_eb.io import load_tess_votable
+from mikulasek_eb_tess.io import load_tess_votable
 from mikulasek_eb.plotting import (
     LINE_ADOPTED_COLOUR,
     LINE_ADOPTED_WIDTH,
@@ -476,11 +472,14 @@ def plot_forward_check(t, mag, sig, model, fits, seg, title, save_path):
         plt.close(fig)
 
 
-def run_forward_check(star_key: str) -> dict:
+def run_forward_check(star_key: str, out_dir: Path | None = None) -> dict:
     """Run the forward check for one star and write the figure and summary.
 
     Args:
         star_key (str): Key in the manifest (must have a template builder).
+        out_dir (Path | None): Directory for the summary and the figure. The
+            default is ``results`` at the package root. The directory is created
+            when it is missing.
 
     Returns:
         dict: Machine-readable summary: ``star``, ``n_points``, ``cadence_min``,
@@ -491,6 +490,9 @@ def run_forward_check(star_key: str) -> dict:
     Raises:
         KeyError: If no template builder exists for the star.
     """
+    if out_dir is None:
+        out_dir = RESULTS_DIR
+    out_dir.mkdir(parents=True, exist_ok=True)
     if star_key not in TEMPLATE_BUILDERS:
         raise KeyError(f"No Table 1 template builder for {star_key}.")
     entry, paper, tess_lambda = load_star(star_key)
@@ -561,10 +563,10 @@ def run_forward_check(star_key: str) -> dict:
         )
     for line in lines:
         logger.info(line)
-    summary_path = RESULTS_DIR / f"paper_forward_{star_key.lower()}.txt"
+    summary_path = out_dir / f"paper_forward_{star_key.lower()}.txt"
     summary_path.write_text("\n".join(lines) + "\n")
 
-    figure_path = RESULTS_DIR / f"paper_forward_{star_key.lower()}.png"
+    figure_path = out_dir / f"paper_forward_{star_key.lower()}.png"
     shape_text = ", ".join(
         f"{k}={params[k]}" for k in ("D1", "G1", "C1", "C2") if k in params
     )

@@ -80,7 +80,7 @@ Reason for doing this first: the paper comparison must rest on an engine that do
 - Eclipse asymmetry term (AV Del out-of-eclipse asymmetry of about 15 mmag).
 - One place for configuration (`FitConfig` or successor): constants spread over `tom`, `extensions`, `pipeline`; settle before Phase 4 output format.
 - Open validation items: V477 Lyr Gamma (1.28 against 0.79, band hypothesis untested), EK Com C2 (2.2 sigma), Table 1 AR Aur period erratum candidate (to tell Z. Mikulasek), XY Boo, `ebfit`, MAVKA comparison.
-- volightcurve: request a public method that returns the exposure time of a light curve if the data have it (no VOTable standard); then read it in `mikulasek_eb.io`.
+- volightcurve: request a public method that returns the exposure time of a light curve if the data have it (no VOTable standard); then read it in `mikulasek_eb_tess.io`.
 - Local-continuum measurement of the secondary depth in `initial_guess` (bright-secondary case), part of Phase 4 feature extraction.
 - Write to Z. Mikulasek with the results (developer).
 

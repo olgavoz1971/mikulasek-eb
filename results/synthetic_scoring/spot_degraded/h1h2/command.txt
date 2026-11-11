@@ -1,1 +1,0 @@
-examples/spot_degraded_timing.py --cadence 120 --window 0.12 --harmonics 1 2 --arm h1h2

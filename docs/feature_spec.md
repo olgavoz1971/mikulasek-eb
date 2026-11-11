@@ -1,6 +1,6 @@
 # Light-curve features for automatic model selection (draft for review)
 
-Status: first implementation 2026-10-30 (`src/mikulasek_eb/features.py`, `FeatureSettings` holds every window and threshold). Nothing here is validated; thresholds are placeholders to be set from the test stars and labelled as our heuristics. See section 8 for the first results and for where the implementation differs from this text.
+Status: first implementation 2026-10-30 (`src/mikulasek_eb/selection/features.py`; calibrated values in `src/mikulasek_eb_tess/rules.py`, `FeatureSettings` holds every window and threshold). Nothing here is validated; thresholds are placeholders to be set from the test stars and labelled as our heuristics. See section 8 for the first results and for where the implementation differs from this text.
 
 ## 1. Purpose and rules
 
