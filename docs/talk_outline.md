@@ -1249,6 +1249,87 @@ WSL gives no time on sector 30, because the formal sigma is not finite at every 
 
 All `.dat` files of all methods are in `results/nsv807/timing_dat/` (50 files and `index.csv`), written by `examples/nsv807_collect_dat.py`, which only copies. The file names are `NSV807_<light curve>_<method>_<kind>.dat`. The methods are the Mikulášek window timing, the Mikulášek whole-cycle timing, the borrowed sector 4 variants (five) and MAVKA AP, WSAP and WSL. Every header line starts with `#` and names the star, the file, the minimum, the method, the window, the cleaning and the columns. A row without a time (MAVKA rejections) is written as a `#` line with its reason, so every remaining line is data: `jd  err_days  flag`.
 
+### Protocol of the timing of the maxima of NSV 807 (locked, 2026-11-11)
+
+The primary maximum is the maximum that follows a primary minimum, and the secondary maximum is the maximum that follows a secondary minimum. Each is timed on its own.
+
+1. Decided: the four light curves of the minimum timing, with the same cleaned points and the same chosen template of each sector. Sector 30 at 120 s (`p3_h123_b0`), sector 30 at 600 s (`p3_h23_b0`), sector 4 at 1800 s (`p3_h123_b1`) and sector 97 at 200 s (`p3_h123_b1`). The lists of removed points are read and not rewritten. Sector 4 has no removed-point list, so every point is kept.
+2. Decided: the window is centred on the brightest phase of that sector's own template. The template is a magnitude, so the brightest phase is its lowest value. The primary maximum is the brightest phase between 0 and 0.5, and the secondary maximum is the brightest phase between 0.5 and 1. The centre is not required to be 0.25 or 0.75.
+3. Decided: the half-window is 0.16 cycles for both maxima and for every sector.
+4. Decided: one shift of the saved template, with a straight-line baseline. The point rule is the one of the minimum timing: at least 4 points, at least 2 on each side of the centre. A gap longer than 2 cadences inside the window is flagged and the time is kept. The eclipse contact-wall check is not applied.
+5. Decided: sectors 30 and 4 use `sap_flux_err`. Sector 97 has no SAP error column, so the weight is one constant, 8.72 mmag, recovered from the chi-square of the saved solution.
+
+Code: `examples/nsv807_maxima.py`. Run from `mikulasek_eb` with `MPLBACKEND=Agg`:
+
+```
+python examples/nsv807_maxima.py
+```
+
+Each folder `results/nsv807/<run>/maxima/` holds `eclipses.csv`, the two `.dat` files, `result.json`, a summary figure per kind and one figure per timed maximum.
+
+### Results of the timing of the maxima of NSV 807 (2026-11-11)
+
+| Light curve | Centre, primary / secondary (cycles) | Timed, primary / secondary | No time | Median sigma (s) | Gap flag |
+|---|---|---|---|---|---|
+| Sector 30, 120 s | 0.255705 / 0.744005 | 76 / 76 | 2 / 0 | 38.4, 38.8 | 7, 8 |
+| Sector 30, 600 s | 0.257763 / 0.741845 | 74 / 76 | 4 / 0 | 53.8, 69.4 | 4, 5 |
+| Sector 4, 1800 s | 0.253045 / 0.746653 | 58 / 61 | 7 / 6 | 244.8, 90.5 | 0, 0 |
+| Sector 97, 200 s | 0.255420 / 0.744568 | 141 / 142 | 6 / 10 | 33.3, 35.5 | 1, 4 |
+
+A maximum without a time is `too_few_points` or `one_side_uncovered`. On sector 30 at 120 s the two rejected maxima are the primary cycles E=-2 and E=-1, both `one_side_uncovered`. On sector 30 at 600 s the four rejected maxima are primary, three `too_few_points` and one `one_side_uncovered`. On sector 4 they are 5 and 2 for the primary and 4 and 2 for the secondary. On sector 97 they are 2 and 4 for the primary and 4 and 6 for the secondary. The cycle number is an integer of the fitted ephemeris, so sector 30 has negative cycles because its epoch lies inside the sector.
+
+The two centres of one sector are 0.488, 0.484, 0.494 and 0.489 cycles apart, so they are not half a cycle apart. The formal sigma on sector 4 is large. The cadence is 1800 s and the maximum is broad.
+
+### Collected timings of the maxima of NSV 807 (2026-11-11)
+
+The eight `.dat` files are in `results/nsv807/timing_max_dat/`, with `index.csv`, written by `examples/nsv807_collect_maxima.py`. Run from `mikulasek_eb`:
+
+```
+python examples/nsv807_collect_maxima.py
+```
+
+The file names are `NSV807_<light curve>_mikulasek_maximum_<kind>.dat`. The header follows the minimum collection: star, light curve, maximum, method, window centre and half-window, cleaning, template, sigma, flag and columns. A maximum without a time is a `#` line with its cycle and its reason. Every remaining line is `jd  err_days  flag`.
+
+### Copies of the secondary timings, times minus half a period (2026-11-11)
+
+Every secondary timing file under `results/nsv807` has a copy. This covers the minimum timings, the whole-cycle timings, the borrowed sector 4 variants, the MAVKA timings and the maximum timings, both the files in each sector folder and the collected files. The copy sits next to its source and its name ends in `_minus_half_period.dat`. Each time is the source time minus 0.1694812 d, which is half the file period 0.3389624 d. That period is the same in every chosen solution. The error and the flag are unchanged. The comment lines are kept, and the first line of the copy states the shift. The source files are not changed. There are 46 copies.
+
+Script `examples/nsv807_secondary_half_period.py`. Run from `mikulasek_eb`:
+
+```
+python examples/nsv807_secondary_half_period.py
+```
+
+### Magnitude difference of the two maxima of NSV 807 (2026-11-11)
+
+A cycle is kept only when both maxima of that cycle were timed. The windows are the maxima windows already used for this star: a half-window of 0.16 cycles for both maxima, centred on the brightest phase of that sector's own template. The magnitude is the fitted template at the fitted time, the saved template plus the straight-line baseline of that window, not the brightest observed point. The difference is the primary magnitude minus the secondary magnitude. The time is the time of the primary maximum. The error is the root-sum-square of the two magnitude errors. A cycle with only one maximum is omitted. A positive difference means the primary maximum is fainter than the secondary maximum.
+
+The magnitudes are written by `examples/nsv807_maxima_mag.py` into `results/nsv807/<run>/maxima_mag/`. The saved times are not changed. The difference files are written by `examples/nsv807_max_diff.py`. Run from `mikulasek_eb`:
+
+```
+python examples/nsv807_maxima_mag.py
+python examples/nsv807_max_diff.py
+```
+
+One file per light curve is in `results/nsv807/timing_max_diff_dat/`. The columns are `jd  mag_prim_minus_mag_sec  err_dmag`, named in a commented line. The counts of cycles are 75, 74, 53 and 138 for sector 30 at 120 s, sector 30 at 600 s, sector 4 and sector 97.
+
+The figure puts every light curve on one plot, with the formal error of the difference. Every light curve is drawn with a circle. The light curves are distinguished by colour. The time axis is MJD, from `absolute_jd_to_mjd`. Script `examples/nsv807_max_diff_plot.py`, run from `mikulasek_eb` with `MPLBACKEND=Agg`:
+
+```
+python examples/nsv807_max_diff_plot.py
+```
+
+Figure: `results/nsv807/timing_max_diff_dat/dmag_vs_mjd.png`.
+
+| Light curve | Cycles | Median difference (mag) | Range (mag) | Median error (mag) |
+|---|---|---|---|---|
+| Sector 30, 120 s | 75 | -0.0180 | -0.022 to -0.009 | 0.0003 |
+| Sector 30, 600 s | 74 | -0.0183 | -0.022 to -0.011 | 0.0006 |
+| Sector 4, 1800 s | 53 | -0.0373 | -0.044 to 0.019 | 0.0013 |
+| Sector 97, 200 s | 138 | -0.0021 | -0.013 to 0.004 | 0.0004 |
+
+Sector 4 covers MJD 58411 to 58436. The difference sits near -0.037, and one cycle is positive, 0.019 at JD 2458421.386162. The two sector 30 light curves cover the same interval, MJD 59115 to 59142, and they agree at about -0.018. Sector 97 covers MJD 60933 to 60988 and sits near zero, crossing slightly positive.
+
 ### Protocol for V1383 Tau (locked, 2026-11-10)
 
 Status: locked on 2026-11-10. Method only. Results go in separate sections. The star is V1383 Tau (TIC 388995726), a contact binary with a strong O'Connell effect. The protocols of NSV 807 apply, with the changes below.
@@ -1470,6 +1551,121 @@ Median formal sigma of the secondary (s): Mikulášek 22 to 39, AP 23 to 41, WSA
 
 What is not shown: the cause of the systematic differences, the effect of the wider MAVKA windows on the offset beyond the WSAP2 test, the agreement with an independent time such as a spectroscopic ephemeris, the 200 s sectors 70 and 71 at the Mikulášek second-set windows, and the pictures of the individual fits (only the sector 70 secondary Mikulášek figure and the MAVKA folded figures were mentioned in the reports and none of the MAVKA figures was looked at).
 
+### Protocol of the timing of the maxima of V1383 Tau (locked, 2026-11-11)
+
+The rules are those of "Protocol of the timing of the maxima of NSV 807", with these changes.
+
+1. Decided: the five background-cleaned light curves of the minimum timing (`results/v1383_tau/cleaned_bkg/`), and the chosen template of each sector. Sector 42 `p1_h123_b0`, sectors 43 and 44 `p1_h123_b1`, sector 70 `p1_h123_b0_C`, sector 71 `p1_h123_b0`. The weight is `sap_flux_err`.
+2. Decided: the half-window is 0.15 cycles for the primary maximum and 0.14 cycles for the secondary maximum, on every sector. The centre is the brightest phase of that sector's own template, between 0 and 0.5 for the primary maximum and between 0.5 and 1 for the secondary maximum.
+
+Code: `examples/v1383_maxima.py`. Run from `mikulasek_eb` with `MPLBACKEND=Agg`:
+
+```
+python examples/v1383_maxima.py
+```
+
+Each folder `results/v1383_tau/<sector>_fit_bkg/maxima/` holds `eclipses.csv`, the two `.dat` files, `result.json`, a summary figure per kind and one figure per timed maximum.
+
+### Results of the timing of the maxima of V1383 Tau (2026-11-11)
+
+| Sector | Centre, primary / secondary (cycles) | Timed, primary / secondary | No time | Median sigma (s) | Gap flag |
+|---|---|---|---|---|---|
+| 42, 600 s | 0.262523 / 0.738082 | 65 / 64 | 4 / 4 | 133.3, 149.8 | 8, 4 |
+| 43, 600 s | 0.258142 / 0.743017 | 64 / 66 | 2 / 2 | 124.1, 115.3 | 2, 3 |
+| 44, 600 s | 0.252540 / 0.747840 | 63 / 63 | 3 / 0 | 127.0, 121.9 | 2, 2 |
+| 70, 200 s | 0.247603 / 0.752347 | 67 / 68 | 1 / 1 | 96.3, 94.0 | 1, 2 |
+| 71, 200 s | 0.245865 / 0.754202 | 64 / 66 | 2 / 1 | 85.8, 98.3 | 2, 1 |
+
+A maximum without a time is `too_few_points` or `one_side_uncovered`, at the end of a sector. On sector 42 they are 3 and 1 for each kind. On sector 43 they are 2 `one_side_uncovered` for the primary and 1 of each reason for the secondary. On sector 44 they are 2 `too_few_points` and 1 `one_side_uncovered`, all primary. On sector 70 one of each kind is `one_side_uncovered`. On sector 71 the primary has one of each reason and the secondary one `one_side_uncovered`.
+
+The two centres of one sector are 0.476, 0.485, 0.495, 0.505 and 0.508 cycles apart. The formal sigma is 86 to 150 s. The summary figures of the sector 70 primary, the sector 70 secondary and the sector 42 primary were looked at: the template follows the peak. One sector 70 secondary, cycle -3, is flagged `gap`. Its points stop before the fitted time, and that time is 2866 s from the template prediction. Its figure is `results/v1383_tau/s70_fit_bkg/maxima/fits/secondary_maximum/E_-3.png`.
+
+### Collected timings of the maxima of V1383 Tau (2026-11-11)
+
+Fifteen `.dat` files are in `results/v1383_tau/timing_max_dat/`, with `index.csv`, written by `examples/v1383_collect_maxima.py`. Run from `mikulasek_eb`:
+
+```
+python examples/v1383_collect_maxima.py
+```
+
+The file names are `V1383Tau_<sector>_mikulasek_maximum_<kind>.dat`. Each sector has one primary file and two secondary files. The second secondary file ends in `_minus_half_period.dat`. Each time in it is the measured time minus 0.17532 d, half the file period 0.35064 d. That period is the same in every chosen solution. The error and the flag are unchanged, and the first line of the copy states the shift. The header follows the maximum collection of NSV 807, with the V1383 Tau cleaning (background ratio 10) and the template of the sector. A maximum without a time is a `#` line with its cycle and its reason. Every remaining line is `jd  err_days  flag`.
+
+### Magnitude of the maxima of V1383 Tau (2026-11-11)
+
+The windows and the time fit are those of the section above. Each timed maximum also has the magnitude of the fitted template at the fitted time: the saved template at its brightest phase, plus the straight-line baseline of that window. It is not the brightest observed point. The uncertainty is the formal 1-sigma error of that magnitude from the same weighted fit, rescaled in the same way as the time error. The template shape stays frozen, so the magnitude changes from one maximum to the next through the baseline of its window. The repeated fit was required to reproduce the saved time, the saved time error and the saved flag. The earlier files in `timing_max_dat/` are not changed.
+
+Code: `examples/v1383_maxima_mag.py`. Run from `mikulasek_eb`:
+
+```
+python examples/v1383_maxima_mag.py
+```
+
+Each folder `results/v1383_tau/<sector>_fit_bkg/maxima_mag/` holds the sector table and the two `.dat` files. The collected files are in `results/v1383_tau/timing_max_mag_dat/` (15 files and `index.csv`). The columns are `jd  err_days  flag  mag  err_mag`. Each secondary is written twice. In the copy ending `_minus_half_period.dat` the times are earlier by 0.17532 d, and the magnitudes are the magnitudes at the unshifted times.
+
+| Sector | Median magnitude, primary / secondary | Median magnitude error |
+|---|---|---|
+| 42, 600 s | 12.0466 / 12.0331 | 0.00109 / 0.00098 |
+| 43, 600 s | 12.0243 / 11.9787 | 0.00098 / 0.00075 |
+| 44, 600 s | 11.9778 / 11.9277 | 0.00112 / 0.00080 |
+| 70, 200 s | 12.0255 / 12.0207 | 0.00091 / 0.00053 |
+| 71, 200 s | 11.9852 / 11.9860 | 0.00089 / 0.00049 |
+
+The counts of times are those of the timing section. The formal magnitude error is 0.5 to 1.1 mmag.
+
+### Magnitude difference of the two maxima of V1383 Tau (2026-11-11)
+
+A cycle is kept only when both maxima of that cycle were timed. The difference is the fitted-template magnitude of the primary maximum minus that of the secondary maximum. The time is the time of the primary maximum. The error is the root-sum-square of the two magnitude errors. A cycle with only one maximum is omitted. A positive difference means the primary maximum is fainter than the secondary maximum.
+
+The files are written by `examples/v1383_max_diff.py`. Run from `mikulasek_eb`:
+
+```
+python examples/v1383_max_diff.py
+```
+
+One file per sector is in `results/v1383_tau/timing_max_diff_dat/`. The columns are `jd  mag_prim_minus_mag_sec  err_dmag`, named in a commented line. The counts of cycles are 62, 64, 63, 67 and 64 for sectors 42, 43, 44, 70 and 71.
+
+The figure puts every sector on one plot, with the formal error of the difference. Every sector is drawn with a circle. The sectors are distinguished by colour. The time axis is MJD, from `absolute_jd_to_mjd`. Script `examples/v1383_max_diff_plot.py`, run from `mikulasek_eb` with `MPLBACKEND=Agg`:
+
+```
+python examples/v1383_max_diff_plot.py
+```
+
+Figure: `results/v1383_tau/timing_max_diff_dat/dmag_vs_mjd.png`.
+
+| Sector | Cycles | Median difference (mag) | Range (mag) | Median error (mag) |
+|---|---|---|---|---|
+| 42, 600 s | 62 | 0.0140 | 0.002 to 0.023 | 0.0014 |
+| 43, 600 s | 64 | 0.0466 | 0.029 to 0.054 | 0.0013 |
+| 44, 600 s | 63 | 0.0529 | 0.034 to 0.061 | 0.0014 |
+| 70, 200 s | 67 | 0.0080 | -0.009 to 0.013 | 0.0011 |
+| 71, 200 s | 64 | -0.0029 | -0.010 to 0.008 | 0.0010 |
+
+Sectors 42, 43 and 44 cover MJD 59447 to 59524. The difference rises from about 0.01 in sector 42 to about 0.06 at the start of sector 44, and then falls to about 0.034 by the end of sector 44. Sectors 70 and 71 cover MJD 60208 to 60259. They sit near zero, and sector 71 crosses to negative. The lowest point of sector 70, -0.0085 at JD 2460220.162476, is the gapped secondary of cycle -3.
+
+### AP magnitude difference of the two maxima of V1383 Tau (2026-11-11)
+
+The same difference, from the MAVKA AP times and magnitudes. Reply: `agent_mailroom/Mavka_user_to_LC_Modeller_v1383_tau_maxima.md`. AP only, by the researcher's decision. The window centres are the supplied list. The half-windows are 0.145 cycles for the primary maximum and 0.128 cycles for the secondary maximum. The magnitude is the fitted flux at the fitted time, transformed with the `sap_flux` calibration of that file (Pogson, zero point 20.44 mag). Two secondaries have no time, because the extremum fell outside the parabolic part: sector 43 at JD 2459485.74316600, and sector 70 at JD 2460220.37320000. The sector 70 failure is the gapped cycle -3 already noted above.
+
+A cycle is kept only when both maxima of that cycle have an AP time. The cycle is the one of the supplied centre. The difference is the AP magnitude of the primary maximum minus that of the secondary maximum. The time is the AP time of the primary maximum. The error is the root-sum-square of the two magnitude errors. A cycle with only one maximum is omitted.
+
+The files are written by `examples/v1383_mavka_max_diff.py`. Run from `mikulasek_eb`:
+
+```
+python examples/v1383_mavka_max_diff.py
+```
+
+One file per sector is in `results/v1383_tau/mavka_ap_max_diff/`. The columns are `jd  mag_prim_minus_mag_sec  err_dmag`, named in a commented line. The counts of cycles are 62, 64, 63, 66 and 64 for sectors 42, 43, 44, 70 and 71. Sector 70 has one fewer cycle than the Mikulášek file, because the gapped secondary was rejected.
+
+| Sector | Cycles | Median difference (mag) | Range (mag) | Median error (mag) |
+|---|---|---|---|---|
+| 42, 600 s | 62 | 0.0143 | 0.000 to 0.026 | 0.0013 |
+| 43, 600 s | 64 | 0.0448 | 0.027 to 0.053 | 0.0011 |
+| 44, 600 s | 63 | 0.0506 | 0.031 to 0.060 | 0.0011 |
+| 70, 200 s | 66 | 0.0078 | 0.000 to 0.013 | 0.0010 |
+| 71, 200 s | 64 | -0.0028 | -0.011 to 0.007 | 0.0011 |
+
+There is no visible difference between the AP magnitude difference and the Mikulášek magnitude difference. The medians agree to about 2 mmag, which is the size of the formal error.
+
 ### Protocol for SV Cen (locked, 2026-11-10)
 
 Star SV Cen, TIC 324101484. Aim: see how the Mikulášek method deals with a fast period change, not to compare it with MAVKA (MAVKA is postponed). Expected rate about -2.1 s/yr, period about 1.658 d. Data: `lc_shipper/data/SV_Cen`, QLP SAP flux, sectors 10, 11 (1800 s), 37, 38 (600 s), 64, 100 (200 s), 99 (600 s), 2531 d in all. The SPOC file of sector 64 is ignored. About 16 cycles per sector, about 105 eclipses of each kind in all.
@@ -1545,7 +1741,60 @@ Every run reported a half-window of 0.19826 cycles for both minima. The output i
 | 99 | 13 | 12 | 1 | 18.8 | 12.3 |
 | 100 | 16 | 16 | 0 | 17.8 | 14.3 |
 
-The eclipses without a time are at the ends of a sector, where one side of the window is not covered. The O-C over all sectors and the quadratic fit are not done yet.
+The eclipses without a time are at the ends of a sector, where one side of the window is not covered. The quadratic O-C of these times is in "O-C parabola of SV Cen".
+
+### Joint fit of SV Cen with the shape frozen and Pdot free (2026-11-11)
+
+Item 4B of "Protocol for SV Cen". One fit of all seven cleaned QLP sectors together. The template is the sector 64 solution `p3_h123_b1`, held fixed, with the exposure integration off, because the sectors do not share a cadence. The free parameters are the epoch, the period and `Pdot`. One constant baseline is fitted per stretch. A new stretch starts at a gap longer than 0.5 d, which splits every sector at its downlink gap, so there are 11 stretches rather than one per sector. The second piece of sector 99 joins sector 100.
+
+Script `examples/sv_cen_pdot_frozen.py`. Run from `mikulasek_eb` with `MPLBACKEND=Agg`:
+
+```
+python examples/sv_cen_pdot_frozen.py
+```
+
+Output: `results/sv_cen/pdot_frozen/result.json` and `results/sv_cen/pdot_frozen/fit.png`.
+
+The linear O-C elements are P = 1.6573037839324687 d and epoch MJD 51870.08157841349, and `Pdot` starts at 0. That epoch falls on the shallow minimum, and the template is deeper at phase 0, so the script starts the epoch half a period later, at MJD 51870.910230, which puts the deep side of the template on the deep minimum. The same fit started on the unshifted epoch stays half a cycle out (rms 331 mmag, rate -0.01 ± 0.92 s/yr). The script as it stands reproduces the shifted fit below.
+
+The shifted fit converges in 8 iterations, on 40,640 points, and is not rank-deficient.
+
+| | Value | Formal error |
+|---|---|---|
+| Epoch (MJD) | 51870.910417 | 0.000464 d |
+| Period | 1.657303815 d | 0.000000024 d |
+| Period change | 0.003 s/yr | 0.261 s/yr |
+
+The root-mean-square residual is 101 mmag, and the formal error is rescaled by that residual. The fitted rate is consistent with zero. The expected rate of about -2.1 s/yr is not recovered. This is not a measurement of the period change.
+
+The curve shape is variable, and the depth of the minima is very variable. The frozen sector 64 template follows the mean curve only. The early sectors scatter by a few hundred mmag, and the last stretch reaches about -600 mmag. On the folded figure the maxima split into bands, and minima of different depths sit on one template.
+
+Figure: `results/sv_cen/pdot_frozen/fit.png`
+
+### O-C parabola of SV Cen (2026-11-11)
+
+The times are the sector-specific window timings in `results/sv_cen/timing_dat`. Primary and secondary are fitted separately. The reference period is the joint-fit period, 1.657303815 d. The joint-fit epoch, MJD 51870.910417, falls on the secondary of these files, so the primary epoch is half a period earlier, MJD 51870.081765. The cycle number is the nearest integer for a primary and the nearest half-integer for a secondary. Every time falls within 0.009 cycles of that grid.
+
+The fit is O-C = c + b E + a E^2, and the period change is Pdot = 2a / P.
+
+A time is rejected only when its residual from a first parabola, fitted to every timed eclipse, lies more than five robust standard deviations from the residual median. No time reaches that. The largest residuals are 435 s, a sector 11 primary, and 302 s, a sector 100 secondary. Times with a gap or wall flag are kept: 10 primary and 19 secondary. They are the open squares on the figure.
+
+Script `examples/sv_cen_oc_quadratic.py`. Run from `mikulasek_eb` with `MPLBACKEND=Agg`:
+
+```
+python examples/sv_cen_oc_quadratic.py
+```
+
+Output: `results/sv_cen/oc_quadratic/result.json`, `oc.csv` and `oc.png`.
+
+| Minimum | Times | Period change (s/yr) | Error (s/yr) | Residual rms (s) |
+|---|---|---|---|---|
+| Primary | 103 | -0.849 | 0.025 | 135 |
+| Secondary | 104 | -0.841 | 0.024 | 109 |
+
+The quoted error is the formal error rescaled by the reduced chi-square, 43 for the primary and 56 for the secondary. The timing errors are about 20 s and the residual is 135 s and 109 s, so the unscaled formal errors, 0.004 and 0.003 s/yr, are not the uncertainty used here. The two minima agree. The rate of about -2.1 s/yr estimated before the fits lies outside these errors.
+
+Figure: `results/sv_cen/oc_quadratic/oc.png`
 
 ### Timing window on NSV 807
 
