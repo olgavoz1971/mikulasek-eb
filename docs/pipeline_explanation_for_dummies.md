@@ -4,7 +4,7 @@ This note describes what `examples/diagnose_fit.py` actually does today.
 It is a wrapper around `select_model`. The numbered steps below are that
 function, plus the plots at the end.
 
-British English. The selector is for TESS light curves only.
+The selector is for TESS light curves only.
 
 ## The flow in five steps
 
