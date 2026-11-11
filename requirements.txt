@@ -1,0 +1,20 @@
+# Draft. What this package imports, not what happens to be installed elsewhere.
+# No version caps. pip install -r requirements.txt installs the core, the
+# plots, the tests and the TESS adapter together.
+
+# Core
+numpy
+scipy
+astropy
+
+# Figures (optional extra "plot")
+matplotlib
+
+# Tests (optional extra "test")
+pytest
+
+# TESS adapter (optional extra "tess").
+# Not on PyPI. Tracks the main branch; there is no commit pin yet.
+# The [read] extra is required: the adapter calls read_lightcurve, and that
+# pulls the GAVO VOTable packages through volightcurve (from soft.g-vo.org).
+volightcurve[read] @ git+https://github.com/olgavoz1971/volightcurve.git
