@@ -131,16 +131,18 @@ Points per FWHM = FWHM_days / cadence, with FWHM_days ≈ (FWHM in phase) × P.
 
 ## 6. Timings
 
-Two modes (same function, `window` differs):
-- **whole phase** (`window=0.25`): template fixed, shift + baseline per eclipse; most precise for stable shape.
-- **local** (`window≈0.06–0.15`): robust against shape changes, spots, O'Connell variability; less precise.
+`window` is a half-width in cycles. The points fitted for eclipse number E are those with `|phase - E| < window`. The full width of that interval is twice the half-width. A half-width of 0.25 runs from quadrature to quadrature (phase from -0.25 to +0.25). Do not describe it as "±window": that phrase is read as a full width.
 
-`free=("A","D")` lets depth/width float per eclipse. Use only when depth/width demonstrably vary, with `window ≥ 0.1`; in short windows it gave occasional wild solutions in my tests.
+Two modes (same function, the half-width differs):
+- **whole phase** (half-width `window=0.25`): template fixed, shift + baseline per eclipse; most precise for stable shape.
+- **local** (half-width `window` about 0.06 to 0.15): robust against shape changes, spots, O'Connell variability; less precise.
+
+`free=("A","D")` lets depth/width float per eclipse. Use only when depth/width demonstrably vary, with a half-width of at least 0.1; below that it gave occasional wild solutions in my tests.
 
 Procedure:
-1. `out, rows = window_scan(...)`: reports N, median σ, O–C rms and std(z) for windows 0.25, 0.15, 0.10, 0.06.
-2. Choose the window with the **smallest O–C rms**, looking at std(z) only as a calibration check. Never choose by smallest formal σ, and never by std(z) ≈ 1 alone: narrow windows reach std(z) ≈ 1 because σ explodes, not because the timing is good (AA And: window 0.06 had std(z) 0.87 and O–C rms 115 s). A rising O–C rms towards narrow windows is expected (fewer points on the walls) and says nothing about template adequacy. If a narrow window gives a clearly SMALLER rms than the whole phase, the shape varies: prefer local.
-3. Require coverage of BOTH walls: `wb = wall_band(model, r.p)` then `window_scan(..., wall_band=wb)` runs each window with all events and with both-walls events only. Partially covered events rest on one wall and are biased by any wall-shape mismatch. In a synthetic test with data gaps, removing 3 of 53 events cut the scatter about the true times from 16.5 s to 4.5 s (window 0.25) and from 88 s to 4.5 s (window 0.15). A real-data sign of the same problem: O–C rms that grows sharply for narrower windows while std(z) stays ≈ 1 (big-σ outliers hide in z). Report all/walls side by side. Also remove events with huge-σ events at orbit edges dominate an unweighted rms (in a test σ ranged from 3.5 to 644 s). `window_scan` also cuts σ > 5× median and clips at 4σ about the ephemeris; report how many were removed and why.
+1. `out, rows = window_scan(...)`: reports N, median σ, O–C rms and std(z) for half-widths 0.25, 0.15, 0.10 and 0.06.
+2. Choose the half-width with the **smallest O–C rms**, looking at std(z) only as a calibration check. Never choose by smallest formal σ, and never by std(z) ≈ 1 alone: narrow half-widths reach std(z) ≈ 1 because σ explodes, not because the timing is good (AA And: half-width 0.06 had std(z) 0.87 and O–C rms 115 s). A rising O–C rms towards narrow half-widths is expected (fewer points on the walls) and says nothing about template adequacy. If a narrow half-width gives a clearly SMALLER rms than the whole phase, the shape varies: prefer local.
+3. Require coverage of BOTH walls: `wb = wall_band(model, r.p)` then `window_scan(..., wall_band=wb)` runs each window with all events and with both-walls events only. Partially covered events rest on one wall and are biased by any wall-shape mismatch. In a synthetic test with data gaps, removing 3 of 53 events cut the scatter about the true times from 16.5 s to 4.5 s (half-width 0.25) and from 88 s to 4.5 s (half-width 0.15). A real-data sign of the same problem: O–C rms that grows sharply for narrower half-widths while std(z) stays ≈ 1 (big-σ outliers hide in z). Report all/walls side by side. Also remove events with huge-σ events at orbit edges dominate an unweighted rms (in a test σ ranged from 3.5 to 644 s). `window_scan` also cuts σ > 5× median and clips at 4σ about the ephemeris; report how many were removed and why.
 4. `fit_ephemeris(T, sigma, E, deg)` with deg=1 (linear) or 2 (quadratic); inspect O–C for structure. Genuine O–C variation (e.g. light-time effect) inflates scatter; that is not a failure of the method.
 5. Error calibration: with `rescale=True`, σ is scaled by √(rchi2). When the model misfits (flat bottoms), this makes σ conservative, so std(z) < 1 is expected and acceptable (I saw 0.5–0.6 on idealised synthetic data). std(z) > 1.3 means σ underestimated: check shape variability, baselines, and timing outliers.
 6. Primary and secondary timings may be systematically offset (asymmetry, spots, light-travel delay in unequal-mass close binaries). Report them separately and the offset.
@@ -150,7 +152,7 @@ Procedure:
 
 ## 7. Acceptance and stop rules
 
-Declare the fit "adequate for timing" when: parameters finite with D>0, Γ>0; multi-start consistent; residual rms within ~1.5× the out-of-eclipse noise, or the remaining structure is the single-component ceiling and the two-component test (4b) either was done or was judged unnecessary; timings from both-walls events are stable between windows 0.25/0.15; and `oc_diagnostics` has been run and its verdict (white vs correlated scatter) is reported together with the uncertainty actually quoted. Declare "not adequate" and say why otherwise. Heuristic thresholds (mine, not from the paper): adjust them if the user disagrees.
+Declare the fit "adequate for timing" when: parameters finite with D>0, Γ>0; multi-start consistent; residual rms within ~1.5× the out-of-eclipse noise, or the remaining structure is the single-component ceiling and the two-component test (4b) either was done or was judged unnecessary; timings from both-walls events are stable between half-widths 0.25 and 0.15; and `oc_diagnostics` has been run and its verdict (white vs correlated scatter) is reported together with the uncertainty actually quoted. Declare "not adequate" and say why otherwise. Heuristic thresholds (mine, not from the paper): adjust them if the user disagrees.
 
 Budget: at most ~6 tuning iterations per star unless the user asks for more. Stop earlier when χ² improves by < 1% for a new term. Report, don't loop.
 
@@ -204,7 +206,7 @@ Give: star, data and cadence, period, profile and harmonics chosen and why, fina
 ## 9. Do not
 
 - free all parameters at once, or add harmonics beyond 3 without evidence;
-- free A, D in windows < 0.1;
+- free A, D when the half-width is below 0.1;
 - time partially covered eclipses without reporting them separately;
 - judge rms/noise with an in-eclipse-contaminated noise estimate;
 - adopt the two-component profile without the four acceptance checks of 4b;

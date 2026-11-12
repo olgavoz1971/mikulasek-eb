@@ -5,7 +5,6 @@ from __future__ import annotations
 import logging
 
 import numpy as np
-from astropy.time import Time
 
 from .model import EBModel, phase
 from .tom import HALF_ORBIT_WINDOW, TIMING_BASELINE_ORDER
@@ -153,18 +152,6 @@ def two_component_degenerate(p: dict, k: int, depth: float) -> bool:
     """
     a, ab = p[f"A{k}"], p[f"A{k}b"]
     return (a * ab < 0.0) and (abs(a) > abs(depth)) and (abs(ab) > abs(depth))
-
-
-def _mjd_to_jd(t_mjd: float) -> float:
-    """Convert one MJD value to absolute Julian Date.
-
-    Args:
-        t_mjd (float): Modified Julian Date.
-
-    Returns:
-        float: Julian Date (J0 = 0).
-    """
-    return float(Time(t_mjd, format="mjd").jd)
 
 
 def _fold_phase_from_t0(t_jd: float, t0_jd: float, period: float) -> float:

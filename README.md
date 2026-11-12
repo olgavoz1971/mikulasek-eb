@@ -49,7 +49,7 @@ data/                        TESS light curves used by the tests and the paper c
 The core never imports the selection layer or the adapter. A test (`tests/core/test_core_independence.py`) fails if it does.
 For another survey, write a small adapter that reads the data and builds a `FeatureSettings` and a `RuleSettings` calibrated for that survey; `mikulasek_eb_tess/rules.py` is the worked example.
 
-`examples/` reads the light curves in `data/`. `clean_folded.py` and `scan_windows.py` show cleaning and the timing-window scan. `fit_ek_com.py`, `fit_aa_and.py` and `fit_xy_boo.py` are the fits from the regression and selection tests. `fit_v477_lyr.py`, `fit_av_del.py` and `fit_ar_aur.py` lay the published Table 1 model on the TESS file, as the paper test does. `time_ek_com.py` times the eclipses of EK Com. Figures go to `examples/out/`.
+`examples/` reads the light curves in `data/`. `clean_folded.py` and `clean_ek_com.py` draw the folded outlier flags and leave the original file unchanged. `scan_windows.py` shows the timing-window scan. `fit_ek_com.py`, `fit_aa_and.py` and `fit_xy_boo.py` are the fits from the regression and selection tests. `fit_v477_lyr.py`, `fit_av_del.py` and `fit_ar_aur.py` lay the published Table 1 model on the TESS file, as the paper test does. `time_ek_com.py` times the eclipses of EK Com and writes the fit, the folded half-width and one figure per eclipse. Figures go to `examples/out/`.
 
 ## Install and test
 

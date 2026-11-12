@@ -19,13 +19,12 @@ from .tuning import (
 from .model import EBModel
 from .extensions import (
     _fold_phase_from_t0,
-    _mjd_to_jd,
     _two_component_timing_ok,
     eclipse_reweighted_sigma,
     refine_two_component,
     two_component_degenerate,
 )
-from .helpers import complete_template, out_of_eclipse_phase_mask, report_fit
+from .helpers import complete_template, mjd_to_jd, out_of_eclipse_phase_mask, report_fit
 from .config import Config, FitConfig
 from .errors import ConfigError, InvalidLightCurve, NoValidSolution
 from .exposure import suggest_nsub
@@ -230,7 +229,7 @@ def run_staged_fit(
     else:
         seg = np.cumsum(np.r_[0, np.diff(t_mjd) > config.gap_split_days])
     g = initial_guess(t_mjd, mag, period_days)
-    m0_jd = _mjd_to_jd(float(g["M0"]))
+    m0_jd = float(mjd_to_jd(g["M0"]))
     phi_pri = _fold_phase_from_t0(m0_jd, epoch_jd, period_days)
     logger.info(
         "T0=%.10f JD; deepest eclipse M0=%.10f JD; phase vs T0=%.4f",

@@ -11,7 +11,6 @@ import json
 import logging
 
 import numpy as np
-from astropy.time import Time
 
 from .config import (  # noqa: F401
     HALF_ORBIT_WINDOW,
@@ -24,6 +23,7 @@ from .config import (  # noqa: F401
 )
 from .tuning import clip_timings, wall_band
 from .timing import fit_ephemeris, virtual_minima
+from .helpers import mjd_to_jd
 from .model import predicted_time
 from pathlib import Path
 
@@ -40,20 +40,6 @@ COL_SEP = "   "
 
 # Integer E if |E - round(E)| is below this (primary on the T0 fold).
 INTEGER_E_ABS_TOL = 1e-6
-
-
-def mjd_to_jd(t_mjd: np.ndarray | float) -> np.ndarray:
-    """Convert MJD to absolute Julian Date (J0 = 0).
-
-    Args:
-        t_mjd (ndarray or float): Modified Julian Date.
-
-    Returns:
-        ndarray: Julian Date, same shape as the input after ``asarray``.
-    """
-    t = np.asarray(t_mjd, dtype=float)
-    out = np.asarray(Time(np.atleast_1d(t), format="mjd").jd, dtype=float)
-    return out.reshape(t.shape)
 
 
 def eclipse_number_from_t0(t_jd: np.ndarray, t0_jd: float, period: float) -> np.ndarray:

@@ -7,7 +7,7 @@ description: Fit and select models for TESS eclipsing-binary light curves with t
 
 The method (model, fit, timing, tuning rules) is in the skill `mikulasek-eb`. This skill covers only what is specific to TESS. The adapter is the package `mikulasek_eb_tess`. The core `mikulasek_eb` never imports it.
 
-Worked examples that read the files shipped in `data/` are `examples/clean_folded.py` and `examples/scan_windows.py`.
+Worked examples that read the files shipped in `data/` are `examples/clean_folded.py`, `examples/clean_ek_com.py` and `examples/scan_windows.py`. The two cleaning scripts draw the flagged points and do not modify the file.
 
 ## 0. Install and scope
 
@@ -55,13 +55,13 @@ The wrappers fill in the TESS values when the settings argument is None:
 
 ## 6. Cleaning, and the window for the timings
 
-`flag_folded_outliers(t, mag, period_days)` compares each point with the median of its phase bin. The scatter of the bin is 1.4826 times the median absolute deviation. The defaults are 400 bins and 5 sigma, with at least 5 points in a bin. A bin with fewer points, or with no scatter, raises. The catalogue epoch is not used: the phase zero is the first time, and any zero gives the same bins. `examples/clean_folded.py` runs this on `data/v477_Lyr_sector_26.vot`.
+`flag_folded_outliers(t, mag, period_days)` compares each point with the median of its phase bin. The scatter of the bin is 1.4826 times the median absolute deviation. The defaults are 400 bins and 5 sigma, with at least 5 points in a bin. A bin with fewer points, or with no scatter, raises. The catalogue epoch is not used: the phase zero is the first time, and any zero gives the same bins. Load the file with `load_tess_votable` only. Do not import a private helper, and do not write a cleaned copy into `data/`. The original file stays as it is. Draw the fold and the time series with the flagged points marked, and write the figure under `examples/out/`. `examples/clean_folded.py` does this for `data/v477_Lyr_sector_26.vot` at the default 400 bins. `examples/clean_ek_com.py` does it for `data/EK_Com_sector_49.vot`: 400 bins raises there because phase bin 11 has 4 points, so that example uses 200 bins and 5 sigma (15 of 2651 points). With 100 bins the same file flags none. Use the stated number. Do not try a list of bin counts and keep the one that flags a convenient number.
 
 A cut on the raw magnitude is a poor way to reject points that sit inside an eclipse: the eclipse is the faint part of the curve, so the cut takes the eclipse with the outliers. Prefer the residual from the folded bin, and look at the flagged points before accepting them. On a short or gapped light curve, pass a smaller `n_bins`.
 
 `read_sap_background(path)` reads the SPOC `sap_bkg` column and raises if it is absent. The files in `data/` do not have it. `flag_sap_background(t_jd, t_background, background, ratio=...)` flags points whose background is more than `ratio` times the median background of those points. There is no default ratio. The V1383 Tau light curves were cleaned at 10. A cut in units of the background scatter was tried and rejected: the quiet background is so stable that any multiple of its scatter removes ordinary points. The rule does not look at the magnitude, so a point on an eclipse wall stays unless the background itself is high.
 
-`window_scan` tries several phase windows and reports the O-C scatter of each, so the window is chosen from that scatter rather than from the formal error. The function lives in `mikulasek_eb.tuning`, because it has no TESS number in it, and the adapter re-exports it. `wall_band` is re-exported with it. `examples/scan_windows.py` fits one candidate of `data/EK_Com_sector_49.vot` and runs the scan. The choice of window is described in `mikulasek-eb`, section 6.
+`window_scan` tries several half-widths and reports the O-C scatter of each, so the half-width is chosen from that scatter rather than from the formal error. `window` is a half-width: the points fitted are those with `|phase - E| < window`. The function lives in `mikulasek_eb.tuning`, because it has no TESS number in it, and the adapter re-exports it. `wall_band` is re-exported with it. `examples/scan_windows.py` fits one candidate of `data/EK_Com_sector_49.vot` and runs the scan. The choice of window is described in `mikulasek-eb`, section 6.
 
 ## 7. Order of work on a TESS light curve
 
@@ -70,7 +70,7 @@ A cut on the raw magnitude is a poor way to reject points that sit inside an ecl
 3. Features with `extract_features`, then `tiered_search` or `select_model`.
 4. Report the chosen name, its status, rms, the gains of the steps and whether the search stopped early. Time the minima only from a fit whose status is `ok`, then use `window_scan`.
 
-The fits the tests run on the files in `data/` are examples: `fit_ek_com.py`, `fit_aa_and.py`, `fit_xy_boo.py`, `fit_v477_lyr.py`, `fit_av_del.py`, `fit_ar_aur.py`. Each writes `fit.png` and `trend.png` under `examples/out/`. `time_ek_com.py` times EK Com and writes the O-C figure. `fit_v477_lyr.py`, `fit_av_del.py` and `fit_ar_aur.py` also write the Table 1 comparison figure.
+The fits the tests run on the files in `data/` are examples: `fit_ek_com.py`, `fit_aa_and.py`, `fit_xy_boo.py`, `fit_v477_lyr.py`, `fit_av_del.py`, `fit_ar_aur.py`. Each writes `fit.png` and `trend.png` under `examples/out/`. `time_ek_com.py` times EK Com and writes the fit, the trend, the O-C, the folded half-width and one figure per timed eclipse. `fit_v477_lyr.py`, `fit_av_del.py` and `fit_ar_aur.py` also write the Table 1 comparison figure.
 
 ## 8. TESS specifics of the core rules
 
@@ -85,4 +85,6 @@ The fits the tests run on the files in `data/` are examples: `fit_ek_com.py`, `f
 - lower a threshold in `rules.py` to rescue one star;
 - time or report a fit whose status is not `ok`;
 - replace a failed candidate by a default model;
-- read the VOTable with anything but `load_tess_votable` and `volightcurve`.
+- read the VOTable with anything but `load_tess_votable` and `volightcurve`;
+- write a cleaned light curve into `data/`, or modify the original file;
+- import a private name (a function whose name starts with `_`) to build that file.

@@ -28,8 +28,9 @@ Run from the repository root. Each script reads a light curve in `data/`.
 - [examples/fit_v477_lyr.py](examples/fit_v477_lyr.py): Published Table 1 model laid on the TESS file of V477 Lyr.
 - [examples/fit_av_del.py](examples/fit_av_del.py): Published Table 1 model laid on the TESS file of AV Del.
 - [examples/fit_ar_aur.py](examples/fit_ar_aur.py): Published Table 1 model laid on the TESS file of AR Aur.
-- [examples/time_ek_com.py](examples/time_ek_com.py): Times of minima for EK Com (70 primary, 68 secondary).
-- [examples/clean_folded.py](examples/clean_folded.py): Folded outlier flags on V477 Lyr.
+- [examples/time_ek_com.py](examples/time_ek_com.py): Times of minima for EK Com, with the fit, the folded half-width and one figure per eclipse (70 primary, 68 secondary).
+- [examples/clean_folded.py](examples/clean_folded.py): Folded outlier flags on V477 Lyr, drawn on the fold and against time. The original file is not modified.
+- [examples/clean_ek_com.py](examples/clean_ek_com.py): The same flags on EK Com sector 49, at 200 bins because 400 bins raises.
 - [examples/scan_windows.py](examples/scan_windows.py): O-C window scan on EK Com.
 
 ## Light curves

@@ -20,9 +20,8 @@ Conventions
       and put M0 near the middle of the data to decorrelate M0 and P0.
 Units (the numerical core uses plain floats on purpose; the boundary adds the units)
     times t, M0, P0 and all timing errors: days (the pipeline passes MJD; the ToM files are
-    written in JD, TDB); phase, D, theta: cycles; Gamma, C, Pdot: dimensionless; A, H, S1,
-    y, sigma, rms: magnitudes.  astropy.units is applied where the data enter (time scale
-    conversions), not inside the least-squares residual functions.
+    written in JD). JD and MJD differ by the constant JD_TO_MJD in helpers. phase, D, theta:
+    cycles; Gamma, C, Pdot: dimensionless; A, H, S1, y, sigma, rms: magnitudes.
 
 Layers
     mikulasek_eb            the core: model, fits, timing. numpy, scipy, astropy only.
@@ -65,11 +64,10 @@ from .errors import (
     NoValidSolution,
     UnreliableSolution,
 )
-from .helpers import absolute_jd_to_mjd
+from .helpers import absolute_jd_to_mjd, mjd_to_jd
 from .model import PROFILES, EBModel, phase
 from .pipeline import FitPipelineResult, run_staged_fit
 from .solution import ModelSolution
-from .tom import mjd_to_jd
 
 __all__ = [
     # run

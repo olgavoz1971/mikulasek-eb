@@ -5,26 +5,41 @@ from __future__ import annotations
 import logging
 
 import numpy as np
-from astropy.time import Time
 
 from .model import EBModel, phase
 from .fitting import FitResult, _Nuisance
 from .tuning import binned_residuals
 
+# MJD = JD - JD_TO_MJD. The same offset is volightcurve.JD_TO_MJD. This package
+# does not import volightcurve to obtain it.
+JD_TO_MJD = 2400000.5
+
 # Phase half-width for out-of-eclipse residual clip (cycles).
 OUT_OF_ECLIPSE_PHASE_HALF = 0.12
 
 
+def mjd_to_jd(t_mjd: np.ndarray | float) -> np.ndarray:
+    """Add ``JD_TO_MJD`` to convert Modified Julian Date to Julian Date.
+
+    Args:
+        t_mjd (ndarray or float): Modified Julian Date.
+
+    Returns:
+        ndarray: Julian Date, same shape as the input.
+    """
+    return np.asarray(t_mjd, dtype=float) + JD_TO_MJD
+
+
 def absolute_jd_to_mjd(t_jd: np.ndarray | float) -> np.ndarray:
-    """Convert absolute Julian Date to Modified Julian Date for LM fitting.
+    """Subtract ``JD_TO_MJD`` to convert Julian Date to Modified Julian Date.
 
     Args:
         t_jd (ndarray or float): Absolute JD (J0 = 0).
 
     Returns:
-        ndarray: MJD (same shape as input).
+        ndarray: MJD, same shape as the input.
     """
-    return np.asarray(Time(t_jd, format="jd").mjd, dtype=float)
+    return np.asarray(t_jd, dtype=float) - JD_TO_MJD
 
 
 def complete_template(p: dict, model: EBModel) -> dict:
