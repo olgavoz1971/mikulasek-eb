@@ -1,0 +1,42 @@
+# mikulasek-eb
+
+> Phenomenological eclipsing-binary model and eclipse timing, an independent implementation of Mikulášek (2015, A&A 584, A8). This index belongs to the clone in the working directory. Read it before writing a fit.
+
+## Start here
+
+- [README.md](README.md): What the package does, how a model is chosen, and how to install it.
+- [AGENTS.md](AGENTS.md): What to read before writing code, and which directories are not the public interface.
+- [skills/mikulasek-eb/SKILL.md](skills/mikulasek-eb/SKILL.md): The method. Any eclipsing-binary fit, model choice or timing.
+- [skills/mikulasek-eb-tess/SKILL.md](skills/mikulasek-eb-tess/SKILL.md): TESS only. SAP flux, exposure, calibrated settings, cleaning. Read the method skill first.
+
+## Reference
+
+- [references/api.md](references/api.md): Where each public name is imported from, and the engine signatures.
+- [docs/runaway_fits.md](docs/runaway_fits.md): Why a finished fit is marked `ok`, `bound-active` or `unresolved`, and what the second solver does.
+- [docs/mikulasek_implementation_notes.md](docs/mikulasek_implementation_notes.md): Differences from the paper, and the full table of fit checks (section 11).
+- [docs/feature_spec.md](docs/feature_spec.md): Features measured on the folded curve, and the rules that turn them into candidates.
+- [docs/pipeline_explanation_for_dummies.md](docs/pipeline_explanation_for_dummies.md): Plain-language account of profiles versus candidates.
+- [requirements.txt](requirements.txt): Draft dependency list, including `volightcurve` from GitHub.
+
+## Examples
+
+Run from the repository root. Each script reads a light curve in `data/`.
+
+- [examples/fit_ek_com.py](examples/fit_ek_com.py): Staged fit of EK Com, sector 49, as in the regression test.
+- [examples/fit_aa_and.py](examples/fit_aa_and.py): Staged fit of AA And, SPOC sector 16, as in the regression test.
+- [examples/fit_xy_boo.py](examples/fit_xy_boo.py): Model selection for XY Boo, as in the selection test.
+- [examples/fit_v477_lyr.py](examples/fit_v477_lyr.py): Published Table 1 model laid on the TESS file of V477 Lyr.
+- [examples/fit_av_del.py](examples/fit_av_del.py): Published Table 1 model laid on the TESS file of AV Del.
+- [examples/fit_ar_aur.py](examples/fit_ar_aur.py): Published Table 1 model laid on the TESS file of AR Aur.
+- [examples/time_ek_com.py](examples/time_ek_com.py): Times of minima for EK Com (70 primary, 68 secondary).
+- [examples/clean_folded.py](examples/clean_folded.py): Folded outlier flags on V477 Lyr.
+- [examples/scan_windows.py](examples/scan_windows.py): O-C window scan on EK Com.
+
+## Light curves
+
+- [data/](data/): TESS files used by the examples and by `tests/tess/`. Not a scratch directory.
+
+## Not the interface
+
+- [working_scripts/](working_scripts/): Scripts the tests import, including the Table 1 comparison. Not a second API.
+- [todo.md](todo.md): Development log. Not a fitting procedure.

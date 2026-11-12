@@ -6,6 +6,16 @@ Phenomenological light-curve model and eclipse timing for eclipsing binaries, im
 
 **This is an independent re-implementation written from the published description. It is not the author's code and is not endorsed by him.** Differences and open questions against the paper's Table 1 are recorded in `docs/mikulasek_implementation_notes.md` (section 7).
 
+## For AI agents
+
+If you were asked to install this package from GitHub, do these steps in order. Stop before you write any fit.
+
+1. Clone `https://github.com/olgavoz1971/mikulasek-eb` into the working directory and leave the clone there. The clone is the documentation: `AGENTS.md`, `llms.txt`, `skills/`, `examples/`, `docs/` and `data/` stay on disk for the rest of the task.
+2. Read `AGENTS.md`, then `skills/mikulasek-eb/SKILL.md`. When the light curve is from TESS, also read `skills/mikulasek-eb-tess/SKILL.md`.
+3. From that clone run `pip install ".[plot,tess]"`.
+
+Do not run `pip install git+https://github.com/olgavoz1971/mikulasek-eb`. That command keeps `src/` and discards the documentation.
+
 ## What it does
 
 - Global fit of the phase curve (Eqs. 13, 15, 17) with per-segment baselines and propagated uncertainties.
@@ -26,6 +36,7 @@ src/mikulasek_eb/selection/  survey-neutral selection machinery. No calibrated d
 src/mikulasek_eb/compare/    model-free minimum measurement, to compare with other methods.
 src/mikulasek_eb/plotting.py optional, needs matplotlib (extra "plot").
 src/mikulasek_eb_tess/       TESS adapter: reader, exposure rule, calibrated settings, cleaning. Needs volightcurve (extra "tess").
+AGENTS.md  llms.txt         how an agent should use this repository, and an index of the docs
 examples/                    scripts that read the files in data/
 skills/                      agent skills: mikulasek-eb (method, core, selection) and mikulasek-eb-tess (adapter)
 working_scripts/             per-star fit scripts used by the tests, and the Table 1 comparison
