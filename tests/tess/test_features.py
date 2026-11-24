@@ -146,16 +146,35 @@ def test_real_stars_eclipse_character(name, separated, contact_candidate):
     stretch. Calibrated on these stars only (see docs/feature_spec.md).
     """
     p, t = _load(name)
-    f = tess.extract_features(t, p["mag"], p["sig"], p["period"], p["epoch_jd"])
+    f = tess.extract_features(
+        t, p["mag"], p["sig"], p["period"], p["epoch_jd"], tess.FEATURES_EDGE_ONLY
+    )
     v = f.variation
     assert v["separated_eclipses"] is separated
     assert v["contact_candidate"] is contact_candidate
+    assert v["window_source"] == {"primary": "edge_5pct", "secondary": "edge_5pct"}
+
+
+def test_contact_windows_are_narrower_than_the_edge_windows():
+    """With contacts the coverage falls, and each window source is flagged.
+
+    AV Del has coverage 0.66 at the 5 percent edge and about 0.28 at the contacts, so at the
+    separation threshold of 0.3 it changes from continuous to separated. That threshold was
+    placed in a gap between the calibration stars and is a pending decision, not a result.
+    """
+    p, t = _load("AV_Del_sector_81")
+    args = (t, p["mag"], p["sig"], p["period"], p["epoch_jd"])
+    edge = tess.extract_features(*args, tess.FEATURES_EDGE_ONLY).variation
+    con = tess.extract_features(*args, tess.FEATURES).variation
+    assert con["window_source"] == {"primary": "measured", "secondary": "measured"}
+    assert con["eclipse_coverage"] < edge["eclipse_coverage"]
+    assert con["contacts"]["primary"]["flag"] == "measured"
 
 
 def test_edge_level_does_not_change_the_ordering():
     """AR Aur stays separated and the others stay continuous for edge levels 0.05 and 0.1."""
     for level in (0.05, 0.1):
-        st = dataclasses.replace(tess.FEATURES, edge_level=level)
+        st = dataclasses.replace(tess.FEATURES_EDGE_ONLY, edge_level=level)
         cov = {}
         for name in ("AR_Aur_sector_19", "AV_Del_sector_81", "EK_Com_sector_49"):
             p, t = _load(name)

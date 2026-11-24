@@ -165,6 +165,7 @@ def test_tiered_search_runs_three_steps_reports_each_and_obeys_the_stop_rule():
     assert result.final is result.steps[-1].result
     assert result.best.name == result.final.best.name
     assert result.final.output is not None
+    assert result.best.config.policy.allow_two_component is True
     if result.stopped_early:
         assert labels == ["1 baseline", "2 profile"]
         assert all(g < tess.DELTA_BIC_DECISIVE for g in result.gains)
@@ -179,6 +180,8 @@ def test_make_candidate_names_the_profile_harmonics_and_baseline():
     cand = tess.make_candidate(base, 2, (1, 2, 3), 1)
     assert cand.name == "p2_h123_b1"
     assert cand.config.policy.retry_bound_active is False
+    assert cand.config.policy.allow_two_component is False
+    assert cand.config.policy.force_two_component is False
     assert tess.make_candidate(base, 1, (2, 3), 0, keep_curvature=True).name == (
         "p1_h23_b0_C"
     )

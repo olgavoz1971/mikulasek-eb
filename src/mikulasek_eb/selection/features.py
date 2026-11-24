@@ -29,6 +29,7 @@ from ..exposure import estimate_cadence_days
 from ..model import prof1
 from ..solution import package_version, plain
 from ..tuning import noise_floor
+from .contacts import ContactSettings, find_contacts
 
 logger = logging.getLogger(__name__)
 
@@ -84,6 +85,10 @@ class FeatureSettings:
         outlier_nsig (float): Threshold of the outlier fraction (robust sigmas).
         gamma_match_tol (float): Largest accepted distance of the Gamma lookup match.
         parity_window_fwhm (float): Half-width (FWHM) of the odd/even depth windows.
+        contacts (ContactSettings | None): Thresholds of the outer-contact finders. If given,
+            the eclipse windows are placed at the contacts found (a width borrowed from the
+            other eclipse, or the ``edge_level`` edge, are flagged in ``variation``). None
+            keeps the ``edge_level`` edge for both eclipses.
     """
 
     n_bins: int | None
@@ -110,6 +115,7 @@ class FeatureSettings:
     outlier_nsig: float
     gamma_match_tol: float
     parity_window_fwhm: float
+    contacts: ContactSettings | None
 
 
 GROUPS = (
@@ -761,7 +767,8 @@ def extract_features(
 
     # --- D: out-of-eclipse variation
     grid = np.linspace(0.0, 1.0, 2000, endpoint=False)
-    coverage = ooe_ratio = harmonics = None
+    coverage = ooe_ratio = harmonics = contacts = None
+    window_source = {"primary": "edge_5pct", "secondary": "edge_5pct"}
     edge1 = _width(fold, 0.0, lev1 + st.edge_level * A1)
     edge2 = None if A2 is None else _width(fold, sec_centre, lev2 + st.edge_level * A2)
     if A2 is not None:
@@ -774,6 +781,39 @@ def extract_features(
                     f"{nm}: eclipse does not fall to {st.edge_level:.0%} of its depth "
                     f"within half a cycle; its window is taken as the whole cycle"
                 )
+        if st.contacts is not None and fw1 is not None and fw2 is not None:
+            contacts = find_contacts(
+                fold.centres,
+                fold.med,
+                fold.n,
+                float(mad_res),
+                0.0,
+                sec_centre,
+                fw1,
+                fw2,
+                st.contacts,
+            )
+            for name, key in (("primary", "1"), ("secondary", "2")):
+                flag = contacts[name]["flag"]
+                window_source[name] = flag
+                if flag == "fallback_5pct":
+                    notes.append(
+                        f"contacts_{name}: not found by both finders, window kept at the "
+                        f"{st.edge_level:.0%} edge"
+                    )
+                else:
+                    if flag == "borrowed":
+                        notes.append(
+                            f"contacts_{name}: width borrowed from the other eclipse "
+                            "(equal duration, circular orbit assumed)"
+                        )
+                    half = st.window_margin * contacts[name]["half"]
+                    if key == "1":
+                        half1 = half
+                    else:
+                        half2 = half
+        elif st.contacts is not None:
+            notes.append("contacts: FWHM of an eclipse not measured, windows kept at the edge")
         inside = (np.abs(_dphi(grid, 0.0)) < half1) | (
             np.abs(_dphi(grid, sec_centre)) < half2
         )
@@ -829,6 +869,8 @@ def extract_features(
         ooe_amplitude_over_depth=ooe_ratio,
         edge_width1=edge1,
         edge_width2=edge2,
+        window_source=window_source,
+        contacts=contacts,
         separated_eclipses=separated,
         continuous_variation=None if separated is None else not separated,
         equal_depths=equal_depths,

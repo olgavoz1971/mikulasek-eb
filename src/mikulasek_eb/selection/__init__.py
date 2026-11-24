@@ -9,6 +9,7 @@ are arguments that a survey adapter supplies, for example ``mikulasek_eb_tess``.
 baseline, then profile, then harmonics.
 """
 
+from .contacts import ContactSettings, find_contacts
 from .candidates import Candidate, RuleSettings, propose_candidates, review_features
 from .features import (
     FeatureSettings,
@@ -22,6 +23,7 @@ from .tiered import TieredResult, TieredStep, make_candidate, tiered_search
 __all__ = [
     "Candidate",
     "CandidateRow",
+    "ContactSettings",
     "DELTA_BIC_DECISIVE",
     "FeatureSettings",
     "Features",
@@ -30,6 +32,7 @@ __all__ = [
     "TieredResult",
     "TieredStep",
     "extract_features",
+    "find_contacts",
     "gamma_from_width_ratios",
     "make_candidate",
     "propose_candidates",

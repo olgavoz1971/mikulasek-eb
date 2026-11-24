@@ -11,6 +11,11 @@ carries the winner of each step into the next one:
 The search stops before step 3 when step 1 and step 2 each gained less than the decisive BIC
 difference. No survey numbers are held here: the rules and the features are arguments.
 Every candidate is made with the trust-region retry of the fit policy switched off.
+
+The second profile component is not a candidate of the search. The comparison fits are
+single-component. After a winner is chosen, that model is fitted once more with the
+two-component trial of the proposed policy. The stored winner is the model after that
+trial (adopted or rejected).
 """
 
 from __future__ import annotations
@@ -21,6 +26,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Callable, Sequence
 
+from ..api import fit
 from ..errors import NoValidSolution
 from .candidates import Candidate, RuleSettings, propose_candidates
 from .features import Features
@@ -96,6 +102,9 @@ def make_candidate(
 ) -> Candidate:
     """Make one candidate from a proposed one, with the trust-region retry off.
 
+    The second profile component is switched off. It is not a candidate of the search; the
+    winner is fitted with it afterwards (see ``tiered_search``).
+
     Args:
         base (Candidate): Proposed candidate, for the data layer and the reasons.
         profile (int): Table 2 profile.
@@ -118,7 +127,11 @@ def make_candidate(
         ),
         data=dataclasses.replace(base.config.data, baseline_order=order),
         policy=dataclasses.replace(
-            base.config.policy, retry_bound_active=False, keep_curvature=keep_curvature
+            base.config.policy,
+            retry_bound_active=False,
+            keep_curvature=keep_curvature,
+            allow_two_component=False,
+            force_two_component=False,
         ),
     ).validate()
     name = f"p{profile}_h{''.join(map(str, harmonics))}_b{order}"
@@ -163,6 +176,10 @@ def tiered_search(
     on_step: Callable[[str, SelectionResult, float], None] | None = None,
 ) -> TieredResult:
     """Choose a model in three steps: baseline, profile, harmonics.
+
+    Comparison fits are single-component. After the winner is chosen, that model is
+    fitted once more with the two-component trial of the proposed policy, when that
+    policy allows it.
 
     Args:
         t_mjd (ndarray): Times (MJD), strictly increasing.
@@ -273,5 +290,27 @@ def tiered_search(
         ]
         result = run(STEP_HARMONICS, step3, winner.name)
         winner = result.best
+
+    if base.config.policy.allow_two_component:
+        cfg = dataclasses.replace(
+            winner.config,
+            policy=dataclasses.replace(
+                winner.config.policy,
+                allow_two_component=True,
+                force_two_component=base.config.policy.force_two_component,
+            ),
+        ).validate()
+        logger.info(
+            "%s two-component trial on the winner %s only (not during the search)",
+            data_id,
+            winner.name,
+        )
+        output = fit(
+            t_mjd, mag, sig, period_days, epoch_jd, cfg, data_id=data_id
+        )
+        winner = Candidate(winner.name, cfg, winner.reasons)
+        result.best = winner
+        result.output = output
+        result.fits[winner.name] = output
 
     return TieredResult(best=winner, final=result, steps=steps, stopped_early=stop)

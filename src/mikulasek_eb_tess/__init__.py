@@ -31,7 +31,7 @@ from .auxiliary import (
 )
 from .exposure import tess_exposure_days
 from .io import load_tess_votable
-from .rules import FEATURES, RULES
+from .rules import CONTACTS, FEATURES, FEATURES_EDGE_ONLY, RULES
 from .selection import (
     extract_features,
     propose_candidates,
@@ -44,7 +44,9 @@ __all__ = [
     "Candidate",
     "CandidateRow",
     "DELTA_BIC_DECISIVE",
+    "CONTACTS",
     "FEATURES",
+    "FEATURES_EDGE_ONLY",
     "FeatureSettings",
     "Features",
     "RULES",

@@ -214,3 +214,19 @@ is known. Until then the thresholds are placeholders.
 **Interim work.** Stars are analysed one by one in a supervised mode: the
 existing tools are run, the chosen fits are judged by the residual numbers and
 by plots, and rules are changed only when the evidence supports it.
+
+## 13. Outer contacts as the eclipse windows (locked 2026-11-24)
+
+The 5 percent edge of section 9 is a convention. The window of each eclipse is now placed at its outer contacts, found on the median fold, with an explicit flagged fallback to the 5 percent edge. Code: `src/mikulasek_eb/selection/contacts.py`; thresholds `ContactSettings` (no defaults, calibrated in `mikulasek_eb_tess.CONTACTS`); the field `FeatureSettings.contacts` (None keeps the old measurement, `mikulasek_eb_tess.FEATURES_EDGE_ONLY`).
+
+**Agreement (locked).**
+1. Two finders look at each side of each eclipse. *Jump scan*: the slope outside minus the slope inside, on two windows of 0.25 FWHM, maximum from 0.6 FWHM out to 0.25 cycles (primary) or 0.2 (secondary); accepted at 10 sigma or more, tail at most 0.1 of the peak, peak shift at most 1.2 when the windows are 0.75 FWHM, and not at the scan edge. *Method A*: a broken line fitted in windows that start at half depth and are 1, 1.5 and 2 FWHM wide (capped at the scan limit); the hinge is the contact; accepted when the hinge is at least 0.08 of the window from both ends, the inner slope descends, the outer slope is at most 0.3 of the inner one, and the hinge varies by at most 10 percent over the three windows. The broken line is method A of Andronov and co-workers as in Mavka (Andrych, Andronov and Chinarova 2020, J. Phys. Stud. 24, 1902; code of M. Yu. Pyatnytskyy, `lc_approx`, MIT), re-implemented here with no dependency on that package.
+2. Per contact: both accept and differ by at most 15 percent of their mean: `confirmed`, the jump-scan position. One accepts: `single`, its position, with the finder named. Both accept and differ by more: `disagree`, no contact. None: `none`.
+3. An eclipse has contacts when both sides have one. Its half-width is the mean of the two distances.
+4. Exactly one eclipse has contacts: the other takes its half-width, flag `borrowed` (equal duration of both eclipses, which assumes a circular orbit; wrong for an eccentric orbit, for example the secondary of G8 is 40 percent wider).
+5. No eclipse has contacts: both keep the 5 percent window, flag `fallback_5pct`, and a note says so.
+6. The window half-width is `window_margin` times the contact half-width. `variation.window_source` gives the flag of each eclipse and `variation.contacts` the positions, statuses and the reasons each finder refused a side. `eclipse_coverage` and everything built on it (harmonic bins, `separated_eclipses`, `contact_candidate`) use these windows.
+
+**No empirical correction.** The contacts lie inside the mesh first contact of a PHOEBE model by 7 to 19 percent of the half-width on 15 synthetic Tmag 11 curves (one exception, 24 and 29 percent, for the jump scan on a wide eclipse). The visible corner is reached after the occultation starts. No factor is applied.
+
+**Placeholders, not calibrated.** The 15 percent agreement tolerance sits at the observed spread of the two finders (9 to 14 percent) and has not been tested near its boundary. The scan limits and the other thresholds are first guesses from seven real stars and 15 synthetic curves. The coverage threshold of 0.3 is unchanged and is a pending decision: with contact windows AV Del has coverage 0.28 (0.66 at the edge) and V477 Lyr 0.13 (0.53), so both become "separated" and the candidate list changes.
