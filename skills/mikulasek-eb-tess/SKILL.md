@@ -49,6 +49,7 @@ The exposure matters when exposure/FWHM is large. Without it a long cadence bias
 
 The wrappers fill in the TESS values when the settings argument is None:
 - `extract_features`, `review_features`, `propose_candidates`, `select_model`.
+- `extract_features(t_mjd, mag, sig, period_days, epoch_jd)` is the preliminary analysis. It fits nothing and returns `Features`. Run it first on every light curve and read `features.notes` and `review_features(features)`. What each group holds, and what a `None` means, is in section 7b of the `mikulasek-eb` skill.
 - `tiered_search(..., features=, profiles=, start_profile=)`: baseline, then profile, then harmonics. A decisive BIC difference is `DELTA_BIC_DECISIVE` = 10. Profile 1 as the start also tries profile 1 with the curvature kept free.
 - If every candidate of the start profile ends `bound-active`, `tiered_search` raises `NoValidSolution` at step 1. Report it, then rerun with `start_profile=3`, and with 4 if that also fails. The rules are in section 7b of the `mikulasek-eb` skill. The `RULES` numbers are not changed for this.
 - Candidates that fail are recorded and block a confident answer. They are not replaced by a default model.

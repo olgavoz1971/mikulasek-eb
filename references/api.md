@@ -1,6 +1,6 @@
 # API reference
 
-Import locations. The root `mikulasek_eb` exports only the everyday surface (`fit`, `time`, `validate_lightcurve`, `fit_borrowed`, `run_staged_fit`, `FitOutput`, `TimingOutput`, `ModelSolution`, `FitPipelineResult`, `ParameterPlan`, `Config`, `ModelSpec`, `DataSetup`, `FitConfig`, `FitPolicy`, `TimingRecipe`, `EBModel`, `PROFILES`, `phase`, `mjd_to_jd`, `absolute_jd_to_mjd` and the errors). The functions below come from their own modules: `model`, `fitting`, `timing`, `tuning`, `tom`, `extensions`, `exposure`, `validity`, `borrow`, `helpers`.
+Import locations. The root `mikulasek_eb` exports only the everyday surface (`fit`, `time`, `validate_lightcurve`, `fit_borrowed`, `run_staged_fit`, `FitOutput`, `TimingOutput`, `ModelSolution`, `FitPipelineResult`, `ParameterPlan`, `Config`, `ModelSpec`, `DataSetup`, `FitConfig`, `FitPolicy`, `TimingRecipe`, `EBModel`, `PROFILES`, `phase`, `mjd_to_jd`, `absolute_jd_to_mjd` and the errors). The functions below come from their own modules: `model`, `fitting`, `timing`, `tuning`, `tom`, `extensions`, `exposure`, `validity`, `borrow`, `descriptors`, `helpers`.
 Selection (survey-neutral, settings are arguments): `mikulasek_eb.selection` has `extract_features`, `review_features`, `propose_candidates`, `select_model`, `tiered_search`, `make_candidate`, `FeatureSettings`, `RuleSettings`, `Candidate`, `SelectionResult`, `TieredResult`. TESS adapter with calibrated settings: `mikulasek_eb_tess`.
 
 The signatures below are for the engine.
@@ -14,6 +14,9 @@ Profiles: 1 = A(1+Cx²){1−[1−exp(1−cosh x)]^Γ}; 2 = same without C; 3 = A
 
 ## fit_global(t, y, sigma, model, p0, free, ephem0, free_ephem=("M0","P0"), seg=None, order=0, rescale=True) -> FitResult
 `free`: template keys to vary; `free_ephem`: subset of M0, P0, Pdot. Per-segment polynomial baselines (degree `order`) are solved linearly. FitResult: `p`, `ephem`, `err` (dict incl. ephemeris), `chi2`, `dof`, `rchi2`, `rms` (mag, after baselines), `names`, `cov` (order = `names`), `success`. `rescale` multiplies the covariance by rchi2.
+
+## descriptors.eclipse_descriptors(source, p=None) -> dict
+Depth and full width at half depth of both fitted eclipses, as properties of the fitted curve and not of its parameters. `source` is a `ModelSolution` (then `p` is ignored) or an `EBModel` with `p`. Returns `{"eclipse_1": {"depth_mag", "fwhm_cycles"}, "eclipse_2": {...}, "depth_ratio", "fwhm_ratio"}` (ratios are eclipse 2 over eclipse 1). Each eclipse is the sum of its profile copies (main profile plus the second component, if any). Harmonics, O'Connell, the other eclipse, the baseline and the exposure integration are excluded. Depth is the deepest point (mag, fainter positive), width is the distance between the half-depth crossings on both sides of that point (linear interpolation on a 2.5e-5 cycle grid). Raises `ValueError` if `p` is missing, if an eclipse has no positive depth, or if it does not fall below half depth within 0.25 cycles. No uncertainties: a solution stores parameter errors but not their covariance.
 
 ## fit_minimum(t, y, sigma, model, p, ephem, E, window=0.1, order=1, free=(), scan=0.1, rescale=True) -> MinResult
 Points with |ϑ−E| < window. Free: delta [d] (+ multiplicative scales of A, D, G of that eclipse named in `free`). `scan` = initial shift grid half-width in phase. MinResult: `E, T, sigma, delta, n, rchi2, scales`.

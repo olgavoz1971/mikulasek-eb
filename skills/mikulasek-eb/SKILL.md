@@ -17,7 +17,7 @@ Read `references/api.md` for signatures. Related modules: `tuning` (starting val
 multi-start, residuals, window scan, clipping), `pipeline` (staged fit), `tom` (timing files).
 
 Layers. Stay inside the layer the task needs.
-- `mikulasek_eb` is the core (numpy, scipy, astropy). The root exports only the everyday surface: `fit`, `time`, `validate_lightcurve`, `fit_borrowed`, `run_staged_fit`, the result types (`FitOutput`, `TimingOutput`, `ModelSolution`), the configuration types (`Config`, `ModelSpec`, `DataSetup`, `FitConfig`, `FitPolicy`, `TimingRecipe`), `EBModel`, `PROFILES`, `phase`, `mjd_to_jd`, `absolute_jd_to_mjd` and the errors. Everything else is public in its own module (`model`, `fitting`, `timing`, `tuning`, `tom`, `extensions`, `exposure`, `validity`, `borrow`, `helpers`); import it from there, not from the root.
+- `mikulasek_eb` is the core (numpy, scipy, astropy). The root exports only the everyday surface: `fit`, `time`, `validate_lightcurve`, `fit_borrowed`, `run_staged_fit`, the result types (`FitOutput`, `TimingOutput`, `ModelSolution`), the configuration types (`Config`, `ModelSpec`, `DataSetup`, `FitConfig`, `FitPolicy`, `TimingRecipe`), `EBModel`, `PROFILES`, `phase`, `mjd_to_jd`, `absolute_jd_to_mjd` and the errors. Everything else is public in its own module (`model`, `fitting`, `timing`, `tuning`, `tom`, `extensions`, `exposure`, `validity`, `borrow`, `descriptors`, `helpers`); import it from there, not from the root.
 - `mikulasek_eb.selection` chooses a model by evidence. It holds no survey numbers (section 7b).
 - `mikulasek_eb.compare` measures a minimum without the model, to compare with other methods.
 - `mikulasek_eb_tess` is the TESS adapter (reader, exposure rule, calibrated settings). Its own skill is `mikulasek-eb-tess`.
@@ -165,6 +165,29 @@ Budget: at most ~6 tuning iterations per star unless the user asks for more. Sto
 - A survey adapter supplies the settings. For TESS use `mikulasek_eb_tess` (skill `mikulasek-eb-tess`). For any other survey never reuse the TESS numbers. Stop, say that no calibration exists, and ask the user whether to calibrate or to fit by hand with sections 2 to 4.
 - No candidate finishing with status `ok` raises; it is never replaced by a default model. Report such a failure as it is.
 
+### Preliminary analysis: `extract_features`
+
+This is the public method for the preliminary analysis of a light curve. It fits no model. Use it to look at a light curve before any fit, and never re-implement a fold, a depth or a width by hand. The result is a `Features` object (plain data; `to_json`, `from_json`, `features_hash`). Groups, each a dict:
+
+| Attribute | Contents |
+|---|---|
+| `sampling` | counts, span, cadence, exposure and its source, gaps, white-noise estimate, outlier fraction |
+| `geometry` | primary epoch `m0_mjd`, reference level, depths `A1`, `A2` (below the local continuum) and `A1_global`, `A2_global`, depth ratio, secondary offset, `fwhm1`, `fwhm2`, points per FWHM, exposure over FWHM |
+| `shape` | bottom ratio W90/W50, wing ratio W10/W50, bottom curvature, `gamma_estimate` from profile 1, `flat_bottom` |
+| `variation` | eclipse coverage, edge widths, `separated_eclipses`, `equal_depths`, `contact_candidate`, maxima difference and significance, Fourier amplitudes outside the eclipse windows |
+| `ephemeris` | odd and even eclipse depths (period doubled?), drift of the centres between the two halves |
+| `residuals` | fold scatter, trend amplitude, red-noise ratio, correlation time, `n_effective`, steps across gaps |
+| `notes` | `"<feature>: <reason>"` for every feature that could not be measured |
+
+Rules:
+- Phases and widths are in cycles, depths and levels in magnitudes, times in MJD.
+- A feature that cannot be measured is `None`, and `notes` says why. Nothing is replaced by a default. Quote the note, do not fill the value in. A missing feature can change the candidates and raises a flag in `review_features`.
+- A fold with fewer than 80 percent of its phase bins filled raises `InvalidLightCurve` (a sparse light curve or a wrong period). Report it. Do not lower the threshold to get past it.
+- `review_features` turns the features into reasons to ask a person (no secondary, parity pointing to twice the period, secondary offset, fewer than 8 points per FWHM). Read them before fitting.
+- The measurement choices are a `FeatureSettings`. The core has no defaults. For TESS use `mikulasek_eb_tess.extract_features`, which fills in the calibrated values and the TESS exposure rule.
+- The meaning of every feature and the thresholds are in `docs/feature_spec.md`.
+- The `Features` object does not carry the folded curve itself. A figure of the folded light curve with the measurements drawn on it is not available yet.
+
 ### Reading the fit status
 
 `solution.stats["status"]` is set after every fit. `status_reasons` says why. Always read both.
@@ -202,6 +225,10 @@ The trust-region retry is off inside `tiered_search` (`make_candidate` switches 
 ## 8. Reporting
 
 Give: star, data and cadence, period, profile and harmonics chosen and why, final parameters ± errors, rms vs noise floor, residual plot description, the window chosen with the scan table, number of timings, O–C rms, error calibration, the comparison with another timing method if one was made, and an explicit list of caveats (the hard limits in section 0 that apply). Save: parameter JSON, timing CSV (E, T, σ, n, rchi2), figures (folded fit + residuals, O–C), and the run log. Ask the user only when the choice needs domain knowledge (period alias, eccentric orbit, which minima to include).
+
+## 8a. Comparing fits: depth and width, not D, Gamma, C
+
+`D`, `Gamma`, `C` and `A` are correlated inside one profile and mean different things in different Table 2 profiles. Two fits of the same star with the same profile and harmonics can return very different `D` for an almost identical curve (on V477 Lyr TESS, `D` 0.0217 against 0.0166 with `C` free against fixed at 0, while the full width at half depth is 0.0407 against 0.0409 in phase). Do not report a disagreement or an agreement between fits from their `D`, `Gamma` or `C`. Use `mikulasek_eb.descriptors.eclipse_descriptors(solution)` (or `(model, p)`): depth in mag and full width at half depth in phase of each eclipse, and the two ratios. It measures the fitted eclipse curve alone, without harmonics, baseline or exposure integration, and returns point values only (no errors). Depths still depend on band and aperture, so compare them across fits of one light curve, not across bands.
 
 ## 9. Do not
 
