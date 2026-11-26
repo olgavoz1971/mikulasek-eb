@@ -24,6 +24,12 @@ Points with |ϑ−E| < window. Free: delta [d] (+ multiplicative scales of A, D,
 ## virtual_minima(t, y, sigma, model, p, ephem, window=0.25, order=1, free=(), min_points=10, min_each_side=3) -> dict of arrays (E, T, sigma, delta, n, rchi2)
 All eclipses with enough points on both sides. Call per instrument/filter. window is capped at 0.25.
 
+## plotting.save_timing_windows(t_mjd, mag, sig, solution, timing, kind, out_dir, eclipses=None) -> list[Path]
+Writes one picture per eclipse of `kind` timed by `time` (`E01_primary.png`, `E00_secondary.png`): whole-cycle points, fitted window, template at the fitted position, found time and prediction; rejected eclipses with their reason. `plotting.plot_timing_window(..., kind, E)` draws one. Needs matplotlib. Same arrays and solution as passed to `time`. Uses `timing.event_curve(t, y, sigma, model, p, ephem, E, delta, window, order)`, which repeats no fit.
+
+## plotting.plot_timing_overview(t_mjd, mag, sig, solution, timings, save_path=None) -> Figure
+Folded light curve over two cycles with the primary and secondary timing windows in one picture.
+
 ## fit_ephemeris(T, sigma, E, deg=2) -> (coefficients, residuals, weighted rms)
 Weighted polynomial T(E).
 

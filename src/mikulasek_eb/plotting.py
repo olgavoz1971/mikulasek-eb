@@ -3,10 +3,15 @@
 from __future__ import annotations
 
 
+from pathlib import Path
+
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.ticker import MaxNLocator
 
-from .model import EBModel
+from .helpers import absolute_jd_to_mjd
+from .model import EBModel, phase, predicted_time
+from .timing import effective_window, event_curve
 
 # Primary zoom panel: |phase| < this (cycles).
 PRIMARY_PHASE_ZOOM_HALF = 0.12
@@ -108,7 +113,14 @@ def _draw_template(ax, x, y, *, colour, width, label):
         width (float): Line width.
         label (str | None): Legend entry. None draws the line without a new name.
     """
-    ax.plot(x, y, color=colour, lw=width, zorder=5 if colour == LINE_ADOPTED_COLOUR else 4, label=label)
+    ax.plot(
+        x,
+        y,
+        color=colour,
+        lw=width,
+        zorder=5 if colour == LINE_ADOPTED_COLOUR else 4,
+        label=label,
+    )
 
 
 def plot_global_fit(
@@ -169,14 +181,44 @@ def plot_global_fit(
 
     with plt.rc_context(style):
         _draw_global_fit(
-            t_jd, mag, sig, yhat, phi, phi_grid, zoom, mag_corr,
-            same, model, p_single, p_adopted, seg, title, timescale, save_path, note,
+            t_jd,
+            mag,
+            sig,
+            yhat,
+            phi,
+            phi_grid,
+            zoom,
+            mag_corr,
+            same,
+            model,
+            p_single,
+            p_adopted,
+            seg,
+            title,
+            timescale,
+            save_path,
+            note,
         )
 
 
 def _draw_global_fit(
-    t_jd, mag, sig, yhat, phi, phi_grid, zoom, mag_corr,
-    same, model, p_single, p_adopted, seg, title, timescale, save_path, note,
+    t_jd,
+    mag,
+    sig,
+    yhat,
+    phi,
+    phi_grid,
+    zoom,
+    mag_corr,
+    same,
+    model,
+    p_single,
+    p_adopted,
+    seg,
+    title,
+    timescale,
+    save_path,
+    note,
 ) -> None:
     """Draw the four panels. Called with the enlarged font already set.
 
@@ -312,20 +354,36 @@ def _draw_global_fit(
     )
     if not same:
         _draw_template(
-            ax, zoom, model(zoom, p_single),
-            colour=LINE_SINGLE_COLOUR, width=LINE_SINGLE_WIDTH, label="single-component",
+            ax,
+            zoom,
+            model(zoom, p_single),
+            colour=LINE_SINGLE_COLOUR,
+            width=LINE_SINGLE_WIDTH,
+            label="single-component",
         )
         _draw_template(
-            ax, zoom, model(0.5 + zoom, p_single),
-            colour=LINE_SINGLE_COLOUR, width=LINE_SINGLE_WIDTH, label=None,
+            ax,
+            zoom,
+            model(0.5 + zoom, p_single),
+            colour=LINE_SINGLE_COLOUR,
+            width=LINE_SINGLE_WIDTH,
+            label=None,
         )
     _draw_template(
-        ax, zoom, model(zoom, p_adopted),
-        colour=LINE_ADOPTED_COLOUR, width=LINE_ADOPTED_WIDTH, label="adopted fit",
+        ax,
+        zoom,
+        model(zoom, p_adopted),
+        colour=LINE_ADOPTED_COLOUR,
+        width=LINE_ADOPTED_WIDTH,
+        label="adopted fit",
     )
     _draw_template(
-        ax, zoom, model(0.5 + zoom, p_adopted),
-        colour=LINE_ADOPTED_COLOUR, width=LINE_ADOPTED_WIDTH, label=None,
+        ax,
+        zoom,
+        model(0.5 + zoom, p_adopted),
+        colour=LINE_ADOPTED_COLOUR,
+        width=LINE_ADOPTED_WIDTH,
+        label=None,
     )
     ax.set_xlabel("Phase from minimum centre")
     ax.set_ylabel("Magnitude (template scale)")
@@ -399,7 +457,9 @@ def plot_instrumental_trend(
     if injected_mag is not None:
         injected = np.asarray(injected_mag, float)
         injected = injected - np.median(injected) + np.median(trend)
-        axes[1].plot(t, injected, "k-", lw=0.8, alpha=0.7, label="injected trend, median aligned")
+        axes[1].plot(
+            t, injected, "k-", lw=0.8, alpha=0.7, label="injected trend, median aligned"
+        )
     axes[1].set_ylabel("trend (mag)")
     axes[1].legend(loc="upper right")
     axes[2].plot(t, mag - trend, ".", ms=2, color="0.6", label="data minus trend")
@@ -411,3 +471,523 @@ def plot_instrumental_trend(
     fig.tight_layout()
     fig.savefig(save_path, dpi=100)
     plt.close(fig)
+
+
+# ------------------------------------------------------------ timing windows
+DAY_S = 86400.0
+WINDOW_REJECTED_COLOUR = "0.55"
+
+
+def eclipse_picture_stem(kind: str, E: float) -> str:
+    """File stem of one eclipse picture, in the MAVKA layout ``E00_secondary``.
+
+    Eclipse number ``E`` is counted from T0: an integer is a primary, ``n + 0.5``
+    is the secondary of the same cycle ``n``. The stem uses the cycle number, so
+    ``E=1`` is ``E01_primary`` and ``E=0.5`` is ``E00_secondary``.
+
+    Args:
+        kind (str): ``primary`` or ``secondary``.
+        E (float): Eclipse number from T0.
+
+    Returns:
+        str: Stem without the ``.png`` suffix.
+    """
+    cycle = int(np.floor(float(E) + 1e-9))
+    return f"E{cycle:02d}_{kind}"
+
+
+def _plot_shifted_template(ax, t_rel, y_grid, in_grid) -> None:
+    """Draw the template in red inside the window and in grey outside it.
+
+    Args:
+        ax (matplotlib.axes.Axes): Target axes.
+        t_rel (ndarray): Times from the predicted minimum (days).
+        y_grid (ndarray): Template plus baseline.
+        in_grid (ndarray): True on the fitted window.
+    """
+    inside = np.where(in_grid, y_grid, np.nan)
+    outside = np.where(~in_grid, y_grid, np.nan)
+    ax.plot(
+        t_rel,
+        outside,
+        color=LINE_SINGLE_COLOUR,
+        lw=LINE_SINGLE_WIDTH,
+        zorder=4,
+        label="template outside the window",
+    )
+    ax.plot(
+        t_rel,
+        inside,
+        color=LINE_ADOPTED_COLOUR,
+        lw=LINE_ADOPTED_WIDTH,
+        zorder=5,
+        label="template in the window",
+    )
+
+
+def _timing_events(t_mjd, solution, timing, kind: str) -> list[dict]:
+    """List the timed and the rejected eclipses of one kind, numbered from M0 and from T0.
+
+    Args:
+        t_mjd (ndarray): Times (MJD) that were timed.
+        solution (ModelSolution): Solution whose template was used.
+        timing (TimingOutput): Result of ``mikulasek_eb.time``.
+        kind (str): ``primary`` or ``secondary``.
+
+    Returns:
+        list[dict]: One dict per eclipse, sorted by ``E``: ``E`` (from T0), ``E_m0``
+        (engine number), ``timed`` (bool), ``T_mjd``, ``sigma`` and ``delta`` (days),
+        ``n``, ``reason``, ``detail``.
+
+    Raises:
+        ValueError: If ``timing`` was made with another solution or has no ``kind``.
+    """
+    if timing.solution_hash != solution.solution_hash():
+        raise ValueError("timing was made with a different solution")
+    if kind not in timing.timings:
+        raise ValueError(f"kind {kind!r} was not timed; timed: {list(timing.timings)}")
+    ephem = solution.ephem
+    events = []
+    timed = timing.timings[kind]
+    for i, e in enumerate(np.asarray(timed.get("E", []), float)):
+        t_mjd_found = float(absolute_jd_to_mjd(float(timed["T"][i])))
+        th = float(phase(t_mjd_found, ephem["M0"], ephem["P0"], ephem.get("Pdot", 0.0)))
+        events.append(
+            dict(
+                E=float(e),
+                E_m0=float(np.round(2 * th) / 2),
+                timed=True,
+                T_mjd=t_mjd_found,
+                sigma=float(timed["sigma"][i]),
+                delta=float(timed["delta"][i]),
+                n=int(timed["n"][i]),
+                reason="",
+                detail="",
+            )
+        )
+    for item in timing.rejected[kind]:
+        t_pred = float(absolute_jd_to_mjd(float(item["T_pred_jd"])))
+        th = float(phase(t_pred, ephem["M0"], ephem["P0"], ephem.get("Pdot", 0.0)))
+        events.append(
+            dict(
+                E=float(item["E"]),
+                E_m0=float(np.round(2 * th) / 2),
+                timed=False,
+                reason=item["reason"],
+                detail=item["detail"],
+            )
+        )
+    return sorted(events, key=lambda r: r["E"])
+
+
+def _eclipse_geometry(t, y, sig, model, solution, timing, ev, kind) -> dict:
+    """Arrays and labels needed to draw one eclipse, in MJD of the observations.
+
+    Args:
+        t (ndarray): Times (MJD).
+        y (ndarray): Magnitudes.
+        sig (ndarray): Magnitude errors.
+        model (EBModel): Template model.
+        solution (ModelSolution): Solution whose template was used.
+        timing (TimingOutput): Result of ``mikulasek_eb.time``.
+        ev (dict): One element of ``_timing_events``.
+        kind (str): ``primary`` or ``secondary``.
+
+    Returns:
+        dict: Times in MJD, masks, the optional template curve, window edges and title.
+    """
+    ephem = solution.ephem
+    window = effective_window(
+        timing.recipe.window, timing.recipe.allow_overlapping_windows
+    )
+    colour = POINT_PRIMARY_COLOUR if kind == "primary" else POINT_SECONDARY_COLOUR
+    E = ev["E_m0"]
+    th = phase(t, ephem["M0"], ephem["P0"], ephem.get("Pdot", 0.0))
+    t_pred = float(predicted_time(E, ephem["M0"], ephem["P0"], ephem.get("Pdot", 0.0)))
+    cycle_label = int(np.floor(ev["E"] + 1e-9))
+    delta = float(ev["delta"]) if ev["timed"] else 0.0
+    try:
+        curve = event_curve(
+            t,
+            y,
+            sig,
+            model,
+            solution.p,
+            ephem,
+            E,
+            delta,
+            window,
+            timing.recipe.baseline_order,
+        )
+        edge = curve["half_days"]
+        t_grid = curve["t_grid"]
+        y_grid = curve["y_grid"]
+        in_grid = curve["in_grid"]
+    except ValueError:
+        t_grid = y_grid = in_grid = None
+        Pl = ephem["P0"] * (1.0 + ephem.get("Pdot", 0.0) * E)
+        edge = window * Pl
+    if ev["timed"]:
+        t_found = float(ev["T_mjd"])
+        title = (
+            f"{kind}, cycle {cycle_label:d}, half-window {window:.3f}, n={ev['n']}\n"
+            f"T = {t_found:.6f} MJD, sigma {ev['sigma'] * DAY_S:.1f} s"
+        )
+    else:
+        t_found = None
+        title = (
+            f"{kind}, cycle {cycle_label:d}, half-window {window:.3f}\n"
+            f"NOT TIMED: {ev['reason']} ({ev['detail']})"
+        )
+    return dict(
+        t=t,
+        y=y,
+        cycle=np.abs(th - E) < 0.5,
+        inside=np.abs(th - E) < window,
+        t_grid=t_grid,
+        y_grid=y_grid,
+        in_grid=in_grid,
+        t_lo=t_pred - edge,
+        t_hi=t_pred + edge,
+        colour=colour,
+        timed=ev["timed"],
+        t_found=t_found,
+        sigma=ev.get("sigma"),
+        title=title,
+    )
+
+
+def _mark_found_time(ax, geo) -> None:
+    """Draw a vertical line at the found time of minimum, in MJD.
+
+    Args:
+        ax (matplotlib.axes.Axes): Target axes.
+        geo (dict): Result of ``_eclipse_geometry``.
+    """
+    if geo["t_found"] is None:
+        return
+    ax.axvline(geo["t_found"], color=LINE_ADOPTED_COLOUR, lw=1.2, zorder=4)
+    ax.axvspan(
+        geo["t_found"] - geo["sigma"],
+        geo["t_found"] + geo["sigma"],
+        color=LINE_ADOPTED_COLOUR,
+        alpha=0.25,
+        zorder=1,
+    )
+
+
+def _scatter_window_points(ax, geo, size: float) -> None:
+    """Draw the observed points that fall in the timing window.
+
+    Args:
+        ax (matplotlib.axes.Axes): Target axes.
+        geo (dict): Result of ``_eclipse_geometry``.
+        size (float): Marker size.
+    """
+    if geo["timed"]:
+        ax.scatter(
+            geo["t"][geo["inside"]],
+            geo["y"][geo["inside"]],
+            s=size,
+            color=geo["colour"],
+            zorder=3,
+        )
+    else:
+        ax.scatter(
+            geo["t"][geo["inside"]],
+            geo["y"][geo["inside"]],
+            s=size,
+            facecolor="none",
+            edgecolor=WINDOW_REJECTED_COLOUR,
+            zorder=3,
+        )
+
+
+def _draw_cycle(ax, geo) -> None:
+    """Draw the whole orbital cycle around one eclipse, in MJD.
+
+    Args:
+        ax (matplotlib.axes.Axes): Target axes.
+        geo (dict): Result of ``_eclipse_geometry``.
+    """
+    t, y, inside, cycle = geo["t"], geo["y"], geo["inside"], geo["cycle"]
+    span = geo["colour"] if geo["timed"] else WINDOW_REJECTED_COLOUR
+    ax.axvspan(geo["t_lo"], geo["t_hi"], color=span, alpha=0.12, zorder=0)
+    ax.scatter(t[cycle & ~inside], y[cycle & ~inside], s=5, color="0.65", zorder=2)
+    if geo["t_grid"] is not None:
+        _plot_shifted_template(ax, geo["t_grid"], geo["y_grid"], geo["in_grid"])
+    _scatter_window_points(ax, geo, 12)
+    _mark_found_time(ax, geo)
+    ax.set_title(geo["title"], fontsize=9)
+    ax.set_xlabel("Time (MJD)")
+    ax.set_ylabel("Magnitude")
+    ax.ticklabel_format(axis="x", style="plain", useOffset=False)
+    ax.invert_yaxis()
+
+
+def _draw_zoom(ax, geo) -> None:
+    """Draw only the timing window of one eclipse, in MJD.
+
+    Args:
+        ax (matplotlib.axes.Axes): Target axes.
+        geo (dict): Result of ``_eclipse_geometry``.
+    """
+    if geo["t_grid"] is not None:
+        ax.plot(
+            geo["t_grid"][geo["in_grid"]],
+            geo["y_grid"][geo["in_grid"]],
+            color=LINE_ADOPTED_COLOUR,
+            lw=LINE_ADOPTED_WIDTH,
+            zorder=5,
+        )
+    _scatter_window_points(ax, geo, 18)
+    _mark_found_time(ax, geo)
+    ax.set_xlim(geo["t_lo"], geo["t_hi"])
+    ax.set_title(geo["title"], fontsize=9)
+    ax.set_xlabel("Time (MJD)")
+    ax.set_ylabel("Magnitude")
+    ax.ticklabel_format(axis="x", style="plain", useOffset=False)
+    ax.xaxis.set_major_locator(MaxNLocator(nbins=4, prune=None))
+    ax.invert_yaxis()
+
+
+def _timing_context(t_mjd, mag, sig, solution, timing, kind):
+    """Common inputs of the timing pictures, validated.
+
+    Args:
+        t_mjd (ndarray): Times (MJD) that were timed.
+        mag (ndarray): Magnitudes.
+        sig (ndarray): Magnitude errors.
+        solution (ModelSolution): Solution whose template was used.
+        timing (TimingOutput): Result of ``mikulasek_eb.time``.
+        kind (str): ``primary`` or ``secondary``.
+
+    Returns:
+        tuple: ``(t, y, s, model, events)``.
+    """
+    t, y, s = (np.asarray(a, float) for a in (t_mjd, mag, sig))
+    return t, y, s, solution.build_model(), _timing_events(t, solution, timing, kind)
+
+
+def _one_eclipse_geo(t_mjd, mag, sig, solution, timing, kind, E):
+    """Geometry of one named eclipse.
+
+    Args:
+        t_mjd (ndarray): Times (MJD).
+        mag (ndarray): Magnitudes.
+        sig (ndarray): Magnitude errors.
+        solution (ModelSolution): Solution whose template was used.
+        timing (TimingOutput): Result of ``mikulasek_eb.time``.
+        kind (str): ``primary`` or ``secondary``.
+        E (float): Eclipse number from T0.
+
+    Returns:
+        dict: Result of ``_eclipse_geometry``.
+
+    Raises:
+        ValueError: If the eclipse is not in the result.
+    """
+    t, y, s, model, events = _timing_context(t_mjd, mag, sig, solution, timing, kind)
+    found = [ev for ev in events if ev["E"] == float(E)]
+    if not found:
+        raise ValueError(f"eclipse {E} is not in the {kind} timing result")
+    return _eclipse_geometry(t, y, s, model, solution, timing, found[0], kind)
+
+
+def plot_timing_window(
+    t_mjd, mag, sig, solution, timing, kind: str, E: float, save_path=None
+):
+    """Draw the whole orbital cycle around one timed eclipse (requires matplotlib).
+
+    The x-axis is MJD of the observations. Grey points are the rest of the cycle, coloured
+    points are the fitted window, the template is at the fitted position (red in the
+    window, grey outside), and a red line marks the found time. An eclipse that could
+    not be timed is drawn in grey with the reason. Pass the same arrays and the same
+    solution that ``mikulasek_eb.time`` received.
+
+    Args:
+        t_mjd (ndarray): Times (MJD) that were timed.
+        mag (ndarray): Magnitudes.
+        sig (ndarray): Magnitude errors.
+        solution (ModelSolution): Solution whose template was used.
+        timing (TimingOutput): Result of ``mikulasek_eb.time``.
+        kind (str): ``primary`` or ``secondary``.
+        E (float): Eclipse number counted from T0, as in ``timing``.
+        save_path (str | None): If set, also save the figure here.
+
+    Returns:
+        matplotlib.figure.Figure: The figure.
+
+    Raises:
+        ValueError: If ``timing`` does not belong to ``solution``, ``kind`` was not
+            timed or ``E`` is not in the result.
+    """
+    geo = _one_eclipse_geo(t_mjd, mag, sig, solution, timing, kind, E)
+    fig, ax = plt.subplots(figsize=(8.5, 4.6))
+    _draw_cycle(ax, geo)
+    fig.tight_layout()
+    if save_path:
+        fig.savefig(save_path, dpi=130)
+    return fig
+
+
+def plot_timing_window_zoom(
+    t_mjd, mag, sig, solution, timing, kind: str, E: float, save_path=None
+):
+    """Draw only the fitted window of one eclipse, in MJD (requires matplotlib).
+
+    This is a separate picture, not a second panel of ``plot_timing_window``.
+
+    Args:
+        t_mjd (ndarray): Times (MJD) that were timed.
+        mag (ndarray): Magnitudes.
+        sig (ndarray): Magnitude errors.
+        solution (ModelSolution): Solution whose template was used.
+        timing (TimingOutput): Result of ``mikulasek_eb.time``.
+        kind (str): ``primary`` or ``secondary``.
+        E (float): Eclipse number counted from T0.
+        save_path (str | None): If set, also save the figure here.
+
+    Returns:
+        matplotlib.figure.Figure: The figure.
+
+    Raises:
+        ValueError: If the eclipse is not in the result.
+    """
+    geo = _one_eclipse_geo(t_mjd, mag, sig, solution, timing, kind, E)
+    fig, ax = plt.subplots(figsize=(5.5, 4.2))
+    _draw_zoom(ax, geo)
+    fig.tight_layout()
+    if save_path:
+        fig.savefig(save_path, dpi=130)
+    return fig
+
+
+def save_timing_windows(
+    t_mjd, mag, sig, solution, timing, kind: str, out_dir, eclipses=None
+) -> list:
+    """Write one whole-cycle picture per eclipse, and a zoom in ``out_dir/zoom/``.
+
+    Names follow MAVKA: ``E01_primary.png``. The zoom uses the same name in the
+    subfolder ``zoom``. Each file is closed after saving.
+
+    Args:
+        t_mjd (ndarray): Times (MJD) that were timed.
+        mag (ndarray): Magnitudes.
+        sig (ndarray): Magnitude errors.
+        solution (ModelSolution): Solution whose template was used.
+        timing (TimingOutput): Result of ``mikulasek_eb.time``.
+        kind (str): ``primary`` or ``secondary``.
+        out_dir (str | Path): Folder for the whole-cycle pictures; created if missing.
+        eclipses (iterable of float | None): Eclipse numbers E (from T0) to draw;
+            None draws all, timed and rejected.
+
+    Returns:
+        list[Path]: The whole-cycle files written.
+
+    Raises:
+        ValueError: If ``timing`` does not belong to ``solution``, ``kind`` was not
+            timed, an eclipse in ``eclipses`` is not in the result or there is
+            nothing to draw.
+    """
+    t, y, s, model, events = _timing_context(t_mjd, mag, sig, solution, timing, kind)
+    if eclipses is not None:
+        wanted = [float(e) for e in eclipses]
+        missing = [e for e in wanted if e not in {ev["E"] for ev in events}]
+        if missing:
+            raise ValueError(f"eclipses not in the timing result: {missing}")
+        events = [ev for ev in events if ev["E"] in wanted]
+    if not events:
+        raise ValueError(f"no {kind} eclipses to draw")
+    out_dir = Path(out_dir)
+    zoom_dir = out_dir / "zoom"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    zoom_dir.mkdir(parents=True, exist_ok=True)
+    paths = []
+    for ev in events:
+        geo = _eclipse_geometry(t, y, s, model, solution, timing, ev, kind)
+        stem = eclipse_picture_stem(kind, ev["E"])
+        fig, ax = plt.subplots(figsize=(8.5, 4.6))
+        _draw_cycle(ax, geo)
+        fig.tight_layout()
+        path = out_dir / f"{stem}.png"
+        fig.savefig(path, dpi=130)
+        plt.close(fig)
+        fig, ax = plt.subplots(figsize=(5.5, 4.2))
+        _draw_zoom(ax, geo)
+        fig.tight_layout()
+        fig.savefig(zoom_dir / f"{stem}.png", dpi=130)
+        plt.close(fig)
+        paths.append(path)
+    return paths
+
+
+def plot_timing_overview(t_mjd, mag, sig, solution, timings, save_path=None):
+    """Draw the folded light curve with the timing windows of all eclipses (matplotlib).
+
+    The points are folded on the template ephemeris over two cycles. The windows of the
+    timed eclipses of every kind present in ``timings`` are shaded in one picture
+    (primary and secondary in the colours of the package) and their points are coloured.
+    The windows of rejected eclipses are not drawn on the fold, because the same phase
+    holds both timed and rejected eclipses.
+
+    Args:
+        t_mjd (ndarray): Times (MJD) that were timed.
+        mag (ndarray): Magnitudes.
+        sig (ndarray): Magnitude errors.
+        solution (ModelSolution): Solution whose template was used.
+        timings (TimingOutput | sequence of TimingOutput): Results of ``time``. Pass
+            one per recipe when the kinds were timed with different windows.
+        save_path (str | None): If set, also save the figure here.
+
+    Returns:
+        matplotlib.figure.Figure: The figure.
+    """
+    if hasattr(timings, "timings"):
+        timings = [timings]
+    t, y = np.asarray(t_mjd, float), np.asarray(mag, float)
+    ephem = solution.ephem
+    th = phase(t, ephem["M0"], ephem["P0"], ephem.get("Pdot", 0.0))
+    fold = th - np.floor(th + 0.5)
+    fig, ax = plt.subplots(figsize=(11, 4.8))
+    ax.scatter(fold, y, s=3, color="0.6", zorder=2)
+    ax.scatter(fold + 1.0, y, s=3, color="0.6", zorder=2)
+    labels = []
+    for timing in timings:
+        window = effective_window(
+            timing.recipe.window, timing.recipe.allow_overlapping_windows
+        )
+        for kind in timing.timings:
+            colour = (
+                POINT_PRIMARY_COLOUR if kind == "primary" else POINT_SECONDARY_COLOUR
+            )
+            events = [
+                ev for ev in _timing_events(t, solution, timing, kind) if ev["timed"]
+            ]
+            used = np.zeros(len(t), bool)
+            for ev in events:
+                used |= np.abs(th - ev["E_m0"]) < window
+            centres = (0.0, 1.0) if kind == "primary" else (-0.5, 0.5, 1.5)
+            for c in centres:
+                ax.axvspan(c - window, c + window, color=colour, alpha=0.15, zorder=0)
+            for shift in (0.0, 1.0):
+                ax.scatter(fold[used] + shift, y[used], s=4, color=colour, zorder=3)
+            ax.plot(
+                [],
+                [],
+                color=colour,
+                lw=6,
+                alpha=0.4,
+                label=f"{kind}, half-window {window:.3f}",
+            )
+            labels.append(kind)
+    ax.set_xlim(-0.5, 1.5)
+    ax.set_xlabel("Phase of the template ephemeris")
+    ax.set_ylabel("Magnitude")
+    ax.invert_yaxis()
+    ax.legend(frameon=False, loc="upper center", bbox_to_anchor=(0.5, -0.14), ncol=2)
+    ax.set_title("Folded light curve and timing windows")
+    fig.tight_layout()
+    if save_path:
+        fig.savefig(save_path, dpi=130)
+    return fig

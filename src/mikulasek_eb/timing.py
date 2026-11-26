@@ -143,6 +143,21 @@ def fit_minimum(
     )
 
 
+def effective_window(window, allow_overlap=False):
+    """Half-width of the phase window that ``virtual_minima`` really uses.
+
+    Args:
+        window (float): Requested half-width (cycles).
+        allow_overlap (bool): Allow windows above 0.25 (up to 0.5).
+
+    Returns:
+        float: ``min(window, 0.25)`` without overlap, ``min(window, 0.5)`` with it.
+    """
+    if window > 0.25 and not allow_overlap:
+        return 0.25
+    return min(window, 0.5)
+
+
 def virtual_minima(
     t,
     y,
@@ -198,12 +213,11 @@ def virtual_minima(
     Returns:
         dict: Arrays E, T (days), sigma (days), delta (days), n, rchi2.
     """
-    if window > 0.25 and not allow_overlap:
-        window = 0.25
-    window = min(window, 0.5)
+    window = effective_window(window, allow_overlap)
     if window > 0.25:
         logger.warning(
-            "window %.2f > 0.25: events overlap, neighbouring timings are correlated", window
+            "window %.2f > 0.25: events overlap, neighbouring timings are correlated",
+            window,
         )
     t = np.asarray(t, float)
     th = phase(t, ephem["M0"], ephem["P0"], ephem.get("Pdot", 0.0))
@@ -257,6 +271,67 @@ def virtual_minima(
         k: np.array([getattr(r, k) for r in rows])
         for k in ("E", "T", "sigma", "delta", "n", "rchi2")
     }
+
+
+def event_curve(t, y, sigma, model, p, ephem, E, delta, window, order=1, n_grid=800):
+    """Template at the fitted position of one eclipse, for drawing the timing window.
+
+    No fit is repeated: the shift ``delta`` is the one found by ``fit_minimum`` and only
+    the linear baseline of the window is recovered from it, as in ``fit_minimum``. The
+    curve is evaluated on the whole orbital cycle around the eclipse; the baseline of
+    the window is continued outside the window.
+
+    Args:
+        t (ndarray): Times (days), the array that was timed.
+        y (ndarray): Magnitudes.
+        sigma (ndarray): Magnitude errors.
+        model (EBModel): Template model.
+        p (dict): Template parameters.
+        ephem (dict): Ephemeris (M0, P0 in days; optional Pdot).
+        E (float): Eclipse number counted from M0 (integer primary, n + 0.5 secondary).
+        delta (float): Fitted shift from the predicted time (days).
+        window (float): Half-width of the fitted phase window (cycles).
+        order (int): Per-event baseline polynomial degree.
+        n_grid (int): Number of grid points of the drawn curve on the whole cycle.
+
+    Returns:
+        dict: ``in_window`` (bool mask of the points used), ``t_pred`` (days),
+        ``half_days`` (half-width of the window in days), ``t_grid`` and ``y_grid``
+        (template plus baseline at the fitted position, on the whole cycle),
+        ``in_grid`` (bool mask of ``t_grid`` that lies in the window).
+
+    Raises:
+        ValueError: If the window has no points, so the baseline cannot be recovered.
+    """
+    t, y, sigma = (np.asarray(a, float) for a in (t, y, sigma))
+    M0, P0, Pdot = ephem["M0"], ephem["P0"], ephem.get("Pdot", 0.0)
+    th = phase(t, M0, P0, Pdot)
+    sel = np.abs(th - E) < window
+    if not np.any(sel):
+        raise ValueError(f"no points in the window of eclipse {E}")
+    Pl = P0 * (1.0 + Pdot * E)
+    base = dict(p)
+    for kk in (1, 2):
+        for nm in "DGCK":
+            if f"{nm}1" in p:
+                base.setdefault(f"{nm}{kk}", p[f"{nm}1"])
+    w = 1.0 / sigma[sel]
+    nui = _Nuisance(t[sel], w, None, order)
+    rw = w * (y[sel] - model(th[sel] - delta / Pl, base))
+    t_pred = float(predicted_time(E, M0, P0, Pdot))
+    half = window * Pl
+    t_grid = np.linspace(t_pred - 0.5 * Pl, t_pred + 0.5 * Pl, n_grid)
+    th_grid = phase(t_grid, M0, P0, Pdot)
+    y_grid = model(th_grid - delta / Pl, base) + nui.baseline_at(rw, t_grid)
+    in_grid = np.abs(th_grid - E) < window
+    return dict(
+        in_window=sel,
+        t_pred=t_pred,
+        half_days=half,
+        t_grid=t_grid,
+        y_grid=y_grid,
+        in_grid=in_grid,
+    )
 
 
 # ------------------------------------------------------- O-C helper

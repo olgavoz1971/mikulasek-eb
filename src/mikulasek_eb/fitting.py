@@ -33,7 +33,7 @@ class _Nuisance:
             order (int): Polynomial degree per segment (reduced if a segment is too short).
         """
         seg = np.zeros(len(t), int) if seg is None else np.asarray(seg)
-        self.blocks, self.npar = [], 0
+        self.blocks, self.npar, self.norm = [], 0, []
         for s in np.unique(seg):
             idx = np.where(seg == s)[0]
             tt = t[idx]
@@ -44,6 +44,7 @@ class _Nuisance:
                 * w[idx, None]
             )
             self.blocks.append((idx, V))
+            self.norm.append((tt.mean(), sd if sd > 0 else 1.0, V.shape[1] - 1))
             self.npar += V.shape[1]
 
     def share(self, mask):
@@ -56,6 +57,26 @@ class _Nuisance:
             float: Fractional parameter count.
         """
         return sum(V.shape[1] * mask[idx].mean() for idx, V in self.blocks)
+
+    def baseline_at(self, rw, t_new):
+        """Best-fit baseline of a single-segment fit, evaluated at new times.
+
+        Args:
+            rw (ndarray): Weighted residuals (dimensionless), data minus template.
+            t_new (ndarray): Times (days) at which to evaluate the baseline.
+
+        Returns:
+            ndarray: Baseline (same units as the data before weighting).
+
+        Raises:
+            ValueError: If the object holds more than one segment.
+        """
+        if len(self.blocks) != 1:
+            raise ValueError("baseline_at supports a single segment only")
+        (idx, V), (mean, sd, deg) = self.blocks[0], self.norm[0]
+        c = np.linalg.lstsq(V, rw[idx], rcond=None)[0]
+        x = (np.asarray(t_new, float) - mean) / sd
+        return np.vander(x, deg + 1, increasing=True) @ c
 
     def project(self, rw):
         """Remove the best-fit baselines from weighted residuals.
