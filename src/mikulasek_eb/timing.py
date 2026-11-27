@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 import numpy as np
 from scipy.optimize import least_squares
 
+from .config import BALANCE_RATIO
 from .fitting import _Nuisance, _check_solution, _cov
 from .model import phase, predicted_time
 
@@ -143,6 +144,44 @@ def fit_minimum(
     )
 
 
+def is_balanced(n_before: int, n_after: int, ratio: float = BALANCE_RATIO) -> bool:
+    """Whether the two sides of the predicted centre have comparable counts.
+
+    Args:
+        n_before (int): Points with phase offset less than zero.
+        n_after (int): Points with phase offset greater than zero.
+        ratio (float): Smallest allowed poorer-side over richer-side count.
+
+    Returns:
+        bool: False when the richer side is empty, or when
+        ``min(n_before, n_after) / max(n_before, n_after)`` is below ``ratio``.
+    """
+    richer = max(int(n_before), int(n_after))
+    poorer = min(int(n_before), int(n_after))
+    if richer == 0:
+        return False
+    return poorer / richer >= ratio
+
+
+def combined_flags(walls_ok: bool, balanced: bool) -> str:
+    """Join the wall and balance flags that failed.
+
+    Args:
+        walls_ok (bool): Contact-wall coverage of this minimum.
+        balanced (bool): Side-count balance of this minimum.
+
+    Returns:
+        str: Empty when both flags are True; otherwise ``not walls_ok`` and/or
+        ``unbalanced``, joined by ``; ``.
+    """
+    parts = []
+    if not walls_ok:
+        parts.append("not walls_ok")
+    if not balanced:
+        parts.append("unbalanced")
+    return "; ".join(parts)
+
+
 def effective_window(window, allow_overlap=False):
     """Half-width of the phase window that ``virtual_minima`` really uses.
 
@@ -158,6 +197,31 @@ def effective_window(window, allow_overlap=False):
     return min(window, 0.5)
 
 
+def _walls_covered(d, E, wall_band, min_wall):
+    """Whether both steep walls of one eclipse have enough points.
+
+    Args:
+        d (ndarray): Phase offsets of the window points from the eclipse centre.
+        E (float): Eclipse number (integer primary, n + 0.5 secondary).
+        wall_band (tuple or dict or None): Wall phase band, see ``virtual_minima``.
+        min_wall (int): Fewest points on each wall.
+
+    Returns:
+        bool: True when ``wall_band`` is None, or both walls hold ``min_wall`` points.
+    """
+    if wall_band is None:
+        return True
+    lo, hi = (
+        wall_band[1 if abs(E - round(E)) < 1e-6 else 2]
+        if isinstance(wall_band, dict)
+        else wall_band
+    )
+    return bool(
+        ((d > -hi) & (d < -lo)).sum() >= min_wall
+        and ((d > lo) & (d < hi)).sum() >= min_wall
+    )
+
+
 def virtual_minima(
     t,
     y,
@@ -168,10 +232,11 @@ def virtual_minima(
     window=0.25,
     order=1,
     free=(),
-    min_points=10,
-    min_each_side=3,
+    min_points=4,
+    min_each_side=2,
     wall_band=None,
     min_wall=3,
+    reject_uncovered_walls=None,
     rejected=None,
     allow_overlap=False,
     **kw,
@@ -183,9 +248,11 @@ def virtual_minima(
     neighbouring events are correlated.
 
     Events lacking enough points, or points on both sides of the predicted centre, are
-    skipped and recorded, never dropped silently. If ``wall_band`` is given an event also
-    needs at least ``min_wall`` points on both walls, because partially covered events rest
-    on one wall and are biased by any wall-shape mismatch (see ``eb_tuning.wall_band``).
+    skipped and recorded, never dropped silently. Each timed event carries ``walls_ok``
+    (True when both steep walls hold at least ``min_wall`` points), ``n_before`` and
+    ``n_after`` (counts on each side of the predicted centre), and ``balanced``
+    (False when the poorer side has fewer than ``BALANCE_RATIO`` of the richer side).
+    Uncovered walls skip the event only when ``reject_uncovered_walls`` is True.
     Call separately for each instrument or filter.
 
     Args:
@@ -198,11 +265,15 @@ def virtual_minima(
         window (float): Half-width of the phase window (cycles, capped at 0.25).
         order (int): Per-event baseline polynomial degree.
         free (tuple of str): Shape scales to fit per event.
-        min_points (int): Minimum points in the window.
-        min_each_side (int): Minimum points on each side of the centre.
+        min_points (int): Minimum points in the window. Default 4.
+        min_each_side (int): Minimum points on each side of the centre. Default 2.
         wall_band (tuple or dict or None): (lo, hi) in |phase offset|, or per eclipse
-            {1: (lo, hi), 2: (lo, hi)}.
+            {1: (lo, hi), 2: (lo, hi)}. Used to set ``walls_ok``. If ``reject_uncovered_walls``
+            is True, an uncovered wall is also a reason to skip the event.
         min_wall (int): Minimum points on each wall when ``wall_band`` is given.
+        reject_uncovered_walls (bool | None): If True, skip events with ``walls_ok`` False.
+            None means True when ``wall_band`` is given (the old behaviour of a wall
+            requirement) and False when it is not.
         rejected (list or None): Receives one dict per skipped event:
             ``{"E": float, "reason": "too_few_points" | "one_side_uncovered" |
             "walls_uncovered" | "fit_failed", "detail": str}``.
@@ -211,7 +282,8 @@ def virtual_minima(
         **kw: Passed to ``fit_minimum`` (``scan``, ``rescale``).
 
     Returns:
-        dict: Arrays E, T (days), sigma (days), delta (days), n, rchi2.
+        dict: Arrays E, T (days), sigma (days), delta (days), n, rchi2, walls_ok,
+        n_before, n_after, balanced.
     """
     window = effective_window(window, allow_overlap)
     if window > 0.25:
@@ -219,44 +291,56 @@ def virtual_minima(
             "window %.2f > 0.25: events overlap, neighbouring timings are correlated",
             window,
         )
+    if reject_uncovered_walls is None:
+        reject_uncovered_walls = wall_band is not None
     t = np.asarray(t, float)
     th = phase(t, ephem["M0"], ephem["P0"], ephem.get("Pdot", 0.0))
     En = np.round(2 * th) / 2
     near = np.abs(th - En) < min(window, 0.25)
     rows = []
+    walls_flags = []
+    before_counts = []
+    after_counts = []
+    balance_flags = []
     for E in np.unique(En[near]):
         d = th[np.abs(th - E) < window] - E
+        n_before = int((d < 0).sum())
+        n_after = int((d > 0).sum())
+        walls_ok = _walls_covered(d, E, wall_band, min_wall)
+        balanced = is_balanced(n_before, n_after)
         reason = None
         if len(d) < min_points:
             reason = "too_few_points"
-        elif (d < 0).sum() < min_each_side or (d > 0).sum() < min_each_side:
+        elif n_before < min_each_side or n_after < min_each_side:
             reason = "one_side_uncovered"
-        elif wall_band is not None:
-            lo, hi = (
-                wall_band[1 if abs(E - round(E)) < 1e-6 else 2]
-                if isinstance(wall_band, dict)
-                else wall_band
-            )
-            if ((d > -hi) & (d < -lo)).sum() < min_wall or (
-                (d > lo) & (d < hi)
-            ).sum() < min_wall:
-                reason = "walls_uncovered"
+        elif reject_uncovered_walls and not walls_ok:
+            reason = "walls_uncovered"
         if reason is not None:
             logger.debug(
                 "event E=%s rejected: %s (n=%d, before=%d, after=%d)",
                 E,
                 reason,
                 len(d),
-                int((d < 0).sum()),
-                int((d > 0).sum()),
+                n_before,
+                n_after,
             )
             if rejected is not None:
-                rejected.append(dict(E=float(E), reason=reason, detail=f"n={len(d)}"))
+                rejected.append(
+                    dict(
+                        E=float(E),
+                        reason=reason,
+                        detail=f"n={len(d)} before={n_before} after={n_after}",
+                    )
+                )
             continue
         try:
             rows.append(
                 fit_minimum(t, y, sigma, model, p, ephem, E, window, order, free, **kw)
             )
+            walls_flags.append(walls_ok)
+            before_counts.append(n_before)
+            after_counts.append(n_after)
+            balance_flags.append(balanced)
         except Exception as ex:
             logger.warning("event E=%s fit failed: %s: %s", E, type(ex).__name__, ex)
             if rejected is not None:
@@ -267,10 +351,15 @@ def virtual_minima(
                         detail=f"{type(ex).__name__}: {ex}",
                     )
                 )
-    return {
+    out = {
         k: np.array([getattr(r, k) for r in rows])
         for k in ("E", "T", "sigma", "delta", "n", "rchi2")
     }
+    out["walls_ok"] = np.array(walls_flags, dtype=bool)
+    out["n_before"] = np.array(before_counts, dtype=int)
+    out["n_after"] = np.array(after_counts, dtype=int)
+    out["balanced"] = np.array(balance_flags, dtype=bool)
+    return out
 
 
 def event_curve(t, y, sigma, model, p, ephem, E, delta, window, order=1, n_grid=800):
@@ -399,8 +488,8 @@ def fit_global_shifts(
     seg=None,
     order=1,
     window=0.25,
-    min_points=10,
-    min_each_side=3,
+    min_points=4,
+    min_each_side=2,
     wall_band=None,
     min_wall=3,
     rescale=True,

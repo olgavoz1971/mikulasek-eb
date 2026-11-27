@@ -13,6 +13,7 @@ import logging
 import numpy as np
 
 from .config import (  # noqa: F401
+    BALANCE_RATIO,
     HALF_ORBIT_WINDOW,
     MIN_POINTS_EACH_SIDE,
     MIN_POINTS_PER_EVENT,
@@ -91,7 +92,21 @@ def empty_timings() -> dict:
     Returns:
         dict: Zero-length arrays.
     """
-    return {k: np.array([]) for k in ("E", "T", "sigma", "delta", "n", "rchi2")}
+    return {
+        k: np.array([])
+        for k in (
+            "E",
+            "T",
+            "sigma",
+            "delta",
+            "n",
+            "rchi2",
+            "walls_ok",
+            "n_before",
+            "n_after",
+            "balanced",
+        )
+    }
 
 
 def has_timings(vm: dict | None) -> bool:
@@ -172,7 +187,7 @@ def time_both_walls(
     t0_jd: float,
     period: float,
     *,
-    require_contact_walls: bool = True,
+    require_contact_walls: bool = False,
     clip_outliers: bool = True,
     rejected: list | None = None,
     baseline_order: int = TIMING_BASELINE_ORDER,
@@ -183,10 +198,9 @@ def time_both_walls(
 ) -> dict:
     """Time eclipses; convert T to JD and number E from T0.
 
-    ``require_contact_walls=True`` applies the 90%-10% ingress/egress point
-    count (``wall_band``). ``False`` keeps every event that has observations
-    on both sides of the predicted mid-eclipse (``min_each_side`` in
-    ``virtual_minima``).
+    The 90-to-10 percent wall test is always computed and stored as ``walls_ok``.
+    ``require_contact_walls=True`` also refuses events that fail it. The default
+    is False: those events are timed and flagged.
 
     Args:
         t_mjd (ndarray): Optimiser times (MJD).
@@ -199,7 +213,8 @@ def time_both_walls(
         which (str): ``all``, ``primary``, or ``secondary`` on the T0 fold.
         t0_jd (float): VOTable epoch as absolute JD.
         period (float): Period used to number E (VOTable PARAM, days).
-        require_contact_walls (bool): If True, require sampled 90%-10% walls.
+        require_contact_walls (bool): If True, refuse events that fail the wall test.
+            False (default) times them and sets ``walls_ok``.
         clip_outliers (bool): If True, 5x-median sigma and 4-sigma O-C clip.
         rejected (list | None): If given, receives one dict per eclipse of
             type ``which`` that was not timed: ``E`` (from T0), ``T_pred_jd``
@@ -214,7 +229,7 @@ def time_both_walls(
     Returns:
         dict: Timings with ``T`` as absolute JD and E from T0.
     """
-    wb = wall_band(model, r.p) if require_contact_walls else None
+    wb = wall_band(model, r.p)
     engine_rejected: list = []
     vm = virtual_minima(
         t_mjd,
@@ -229,6 +244,7 @@ def time_both_walls(
         min_points=min_points,
         min_each_side=min_each_side,
         wall_band=wb,
+        reject_uncovered_walls=require_contact_walls,
         rejected=engine_rejected,
         allow_overlap=allow_overlap,
     )

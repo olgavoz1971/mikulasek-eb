@@ -38,8 +38,11 @@ HALF_ORBIT_WINDOW = 0.25
 LOCAL_WINDOWS = (0.15, 0.10, 0.06)
 TIMING_BASELINE_ORDER = 1
 MAX_SIGMA_FACTOR = 5.0
-MIN_POINTS_PER_EVENT = 10
-MIN_POINTS_EACH_SIDE = 3
+MIN_POINTS_PER_EVENT = 4
+MIN_POINTS_EACH_SIDE = 2
+# A timed minimum is unbalanced when the poorer side of the predicted centre
+# has fewer than this fraction of the richer side (min/max).
+BALANCE_RATIO = 1.0 / 3.0
 
 # Fields that are tuples in Python and lists in JSON.
 _TUPLE_FIELDS = {"harmonics", "gamma_starts", "two_comp_eclipses", "local_windows"}
@@ -156,10 +159,13 @@ class TimingRecipe:
             up to 0.5 with ``allow_overlapping_windows``).
         baseline_order (int): Per-event polynomial degree.
         max_sigma_factor (float): Drop events whose sigma exceeds this times the median.
-        require_contact_walls (bool): Require points on both walls (90 to 10 percent band).
+        require_contact_walls (bool): If True, refuse a minimum whose steep walls
+            (90 to 10 percent of depth) are not both sampled. The default is False: the
+            same test is recorded as the ``walls_ok`` flag on each timed minimum.
         clip_outliers (bool): Apply the sigma cut and the 4-sigma O-C clip.
         local_windows (tuple[float, ...]): Windows tried for local primary/secondary-only files.
-        min_points (int): Minimum points in the window of one event (low-cadence data need less).
+        min_points (int): Minimum points in the window of one event. Four is the floor
+            for a template shift (the shift plus a straight baseline).
         min_each_side (int): Minimum points on each side of the predicted centre.
         allow_overlapping_windows (bool): Allow ``window`` above 0.25 (up to 0.5, the whole
             cycle). Windows then overlap the neighbouring event: points are used by two events
@@ -171,7 +177,7 @@ class TimingRecipe:
     window: float = HALF_ORBIT_WINDOW
     baseline_order: int = TIMING_BASELINE_ORDER
     max_sigma_factor: float = MAX_SIGMA_FACTOR
-    require_contact_walls: bool = True
+    require_contact_walls: bool = False
     clip_outliers: bool = True
     local_windows: tuple = LOCAL_WINDOWS
     min_points: int = MIN_POINTS_PER_EVENT

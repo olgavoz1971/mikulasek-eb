@@ -13,10 +13,19 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from .config import Config, FitConfig, TimingRecipe
+from .config import (
+    MIN_POINTS_EACH_SIDE,
+    MIN_POINTS_PER_EVENT,
+    Config,
+    FitConfig,
+    TimingRecipe,
+)
 from .errors import InvalidLightCurve
 from .pipeline import FitPipelineResult, run_staged_fit
 from .solution import ModelSolution, package_version, plain
+from .helpers import mjd_to_jd
+from .model import phase, predicted_time
+from .timing import fit_minimum
 from .tom import time_with_recipe
 from .validity import require_ok
 
@@ -52,7 +61,8 @@ class TimingOutput:
 
     Attributes:
         timings (dict): ``{"primary": {...}, "secondary": {...}}``; each holds arrays
-            E (from T0), T (absolute JD), sigma (days), delta, n, rchi2.
+            E (from T0), T (absolute JD), sigma (days), delta, n, rchi2, walls_ok,
+            n_before, n_after, balanced.
         rejected (dict): For each eclipse type, the list of events that could not be timed
             (E, T_pred_jd, reason, detail).
         recipe (TimingRecipe): Recipe used.
@@ -293,3 +303,142 @@ def time(
             rejected=rejected[kind],
         )
     return TimingOutput(timings, rejected, recipe, solution.solution_hash())
+
+
+@dataclass
+class CycleTimingOutput:
+    """Result of ``time_cycles``: one shift of the whole template per orbital cycle.
+
+    Attributes:
+        cycles (dict): Arrays ``E`` (integer cycle), ``delta`` (days), ``T_primary`` and
+            ``T_secondary`` (absolute JD), ``sigma`` (days), ``n``, ``rchi2``.
+        rejected (list): Cycles that could not be timed (E, reason, detail).
+        min_points (int): Point floor used.
+        min_each_side (int): Per-side floor used.
+        order (int): Per-cycle baseline polynomial degree.
+        solution_hash (str): Hash of the solution whose template was used.
+    """
+
+    cycles: dict
+    rejected: list
+    min_points: int
+    min_each_side: int
+    order: int = 1
+    solution_hash: str = field(default="")
+
+
+def time_cycles(
+    t_mjd,
+    mag,
+    sig,
+    solution: ModelSolution,
+    min_points: int = MIN_POINTS_PER_EVENT,
+    min_each_side: int = MIN_POINTS_EACH_SIDE,
+    order: int = 1,
+) -> CycleTimingOutput:
+    """Time every orbital cycle with one shift of the whole template.
+
+    This is a separate method from ``time``. There is no eclipse window. The points of
+    cycle ``n`` are those with phase in ``(n - 0.25, n + 0.75)``, so the primary and the
+    secondary of that cycle share one shift. The default floor is 4 points with 2 on
+    each side of the cycle centre.
+
+    Args:
+        t_mjd (ndarray): Times (MJD), strictly increasing.
+        mag (ndarray): Magnitudes.
+        sig (ndarray): Magnitude errors.
+        solution (ModelSolution): Provides the template and the T0 numbering.
+        min_points (int): Fewest points in a cycle.
+        min_each_side (int): Fewest points on each side of the cycle centre.
+        order (int): Per-cycle baseline polynomial degree.
+
+    Returns:
+        CycleTimingOutput: One timed cycle is one shift, used for both eclipses.
+
+    Raises:
+        UnreliableSolution: If the solution status is not ``ok``.
+        InvalidLightCurve: If the input is invalid.
+    """
+    require_ok(solution.stats)
+    prov = solution.provenance
+    validate_lightcurve(t_mjd, mag, sig, prov["period_input_days"], prov["epoch_jd"])
+    t_mjd, mag, sig = (np.asarray(a, dtype=float) for a in (t_mjd, mag, sig))
+    ephem = solution.ephem
+    model = solution.build_model()
+    th = phase(t_mjd, ephem["M0"], ephem["P0"], ephem.get("Pdot", 0.0))
+    n_min = int(np.floor(float(np.min(th)) + 0.25))
+    n_max = int(np.floor(float(np.max(th)) + 0.25 - 1e-9))
+    rows = []
+    rejected = []
+    for n in range(n_min, n_max + 1):
+        centre = n + 0.25
+        offset = th - centre
+        inside = np.abs(offset) < 0.5
+        n_in = int(inside.sum())
+        n_before = int(np.sum(offset[inside] < 0))
+        n_after = n_in - n_before
+        if n_in < min_points:
+            rejected.append(
+                dict(E=float(n), reason="too_few_points", detail=f"n={n_in}")
+            )
+            continue
+        if n_before < min_each_side or n_after < min_each_side:
+            rejected.append(
+                dict(E=float(n), reason="one_side_uncovered", detail=f"n={n_in}")
+            )
+            continue
+        try:
+            fit = fit_minimum(
+                t_mjd,
+                mag,
+                sig,
+                model,
+                solution.p,
+                ephem,
+                centre,
+                window=0.5,
+                order=order,
+                free=(),
+            )
+        except Exception as exc:
+            logger.warning("cycle %s fit failed: %s: %s", n, type(exc).__name__, exc)
+            rejected.append(
+                dict(
+                    E=float(n),
+                    reason="fit_failed",
+                    detail=f"{type(exc).__name__}: {exc}",
+                )
+            )
+            continue
+        t_pri = predicted_time(
+            float(n), ephem["M0"], ephem["P0"], ephem.get("Pdot", 0.0)
+        )
+        t_sec = predicted_time(
+            n + 0.5, ephem["M0"], ephem["P0"], ephem.get("Pdot", 0.0)
+        )
+        rows.append(
+            dict(
+                E=float(n),
+                delta=float(fit.delta),
+                T_primary=float(mjd_to_jd(t_pri + fit.delta)),
+                T_secondary=float(mjd_to_jd(t_sec + fit.delta)),
+                sigma=float(fit.sigma),
+                n=int(fit.n),
+                rchi2=float(fit.rchi2),
+            )
+        )
+    if not rows:
+        cycles = {
+            k: np.array([])
+            for k in ("E", "delta", "T_primary", "T_secondary", "sigma", "n", "rchi2")
+        }
+    else:
+        cycles = {k: np.array([row[k] for row in rows]) for k in rows[0]}
+    return CycleTimingOutput(
+        cycles,
+        rejected,
+        min_points,
+        min_each_side,
+        order,
+        solution.solution_hash(),
+    )

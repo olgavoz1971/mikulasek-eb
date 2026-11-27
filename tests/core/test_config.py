@@ -124,6 +124,9 @@ def test_defaults_match_the_values_used_before_the_refactor():
         5.0,
     )
     assert timing.local_windows == (0.15, 0.10, 0.06)
+    assert timing.min_points == 4
+    assert timing.min_each_side == 2
+    assert timing.require_contact_walls is False
     json.loads(_config().to_json())  # valid JSON
 
 

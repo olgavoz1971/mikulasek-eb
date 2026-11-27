@@ -45,7 +45,15 @@ Plotting lives in ``mikulasek_eb.plotting`` (needs matplotlib) and is not import
 
 from __future__ import annotations
 
-from .api import FitOutput, TimingOutput, fit, time, validate_lightcurve
+from .api import (
+    CycleTimingOutput,
+    FitOutput,
+    TimingOutput,
+    fit,
+    time,
+    time_cycles,
+    validate_lightcurve,
+)
 from .borrow import ParameterPlan, fit_borrowed
 from .config import (
     Config,
@@ -73,12 +81,14 @@ __all__ = [
     # run
     "fit",
     "time",
+    "time_cycles",
     "validate_lightcurve",
     "fit_borrowed",
     "run_staged_fit",
     # results
     "FitOutput",
     "TimingOutput",
+    "CycleTimingOutput",
     "ModelSolution",
     "FitPipelineResult",
     "ParameterPlan",

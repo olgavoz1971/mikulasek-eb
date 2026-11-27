@@ -9,9 +9,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 
-from .helpers import absolute_jd_to_mjd
+from .helpers import absolute_jd_to_mjd, mjd_to_jd
 from .model import EBModel, phase, predicted_time
-from .timing import effective_window, event_curve
+from .timing import combined_flags, effective_window, event_curve
+from .tom import eclipse_number_from_t0
 
 # Primary zoom panel: |phase| < this (cycles).
 PRIMARY_PHASE_ZOOM_HALF = 0.12
@@ -537,7 +538,8 @@ def _timing_events(t_mjd, solution, timing, kind: str) -> list[dict]:
     Returns:
         list[dict]: One dict per eclipse, sorted by ``E``: ``E`` (from T0), ``E_m0``
         (engine number), ``timed`` (bool), ``T_mjd``, ``sigma`` and ``delta`` (days),
-        ``n``, ``reason``, ``detail``.
+        ``n``, ``walls_ok``, ``n_before``, ``n_after``, ``balanced``, ``reason``,
+        ``detail``.
 
     Raises:
         ValueError: If ``timing`` was made with another solution or has no ``kind``.
@@ -561,6 +563,10 @@ def _timing_events(t_mjd, solution, timing, kind: str) -> list[dict]:
                 sigma=float(timed["sigma"][i]),
                 delta=float(timed["delta"][i]),
                 n=int(timed["n"][i]),
+                walls_ok=bool(timed["walls_ok"][i]),
+                n_before=int(timed["n_before"][i]),
+                n_after=int(timed["n_after"][i]),
+                balanced=bool(timed["balanced"][i]),
                 reason="",
                 detail="",
             )
@@ -633,6 +639,12 @@ def _eclipse_geometry(t, y, sig, model, solution, timing, ev, kind) -> dict:
             f"{kind}, cycle {cycle_label:d}, half-window {window:.3f}, n={ev['n']}\n"
             f"T = {t_found:.6f} MJD, sigma {ev['sigma'] * DAY_S:.1f} s"
         )
+        flag_text = combined_flags(bool(ev["walls_ok"]), bool(ev["balanced"]))
+        if flag_text:
+            title += (
+                f"\nflags: {flag_text} "
+                f"(before {ev['n_before']}, after {ev['n_after']})"
+            )
     else:
         t_found = None
         title = (
@@ -991,3 +1003,415 @@ def plot_timing_overview(t_mjd, mag, sig, solution, timings, save_path=None):
     if save_path:
         fig.savefig(save_path, dpi=130)
     return fig
+
+
+# ------------------------------------------------------------ whole-cycle timing
+
+
+def _cycle_events(solution, timing) -> list[dict]:
+    """Timed and rejected cycles of ``time_cycles``, numbered from T0 and from M0.
+
+    Args:
+        solution (ModelSolution): Solution whose template was used.
+        timing: A ``CycleTimingOutput``.
+
+    Returns:
+        list[dict]: One dict per cycle, sorted by T0 cycle number.
+
+    Raises:
+        ValueError: If ``timing`` was made with another solution.
+    """
+    if timing.solution_hash != solution.solution_hash():
+        raise ValueError("timing was made with a different solution")
+    prov = solution.provenance
+    t0_jd = float(prov["epoch_jd"])
+    period = float(prov["period_input_days"])
+    ephem = solution.ephem
+    events = []
+    cycles = timing.cycles
+    for i, e_m0 in enumerate(np.asarray(cycles.get("E", []), float)):
+        t_pri_jd = float(cycles["T_primary"][i])
+        events.append(
+            dict(
+                E=float(eclipse_number_from_t0(t_pri_jd, t0_jd, period)),
+                E_m0=float(e_m0),
+                timed=True,
+                T_primary_mjd=float(absolute_jd_to_mjd(t_pri_jd)),
+                T_secondary_mjd=float(
+                    absolute_jd_to_mjd(float(cycles["T_secondary"][i]))
+                ),
+                sigma=float(cycles["sigma"][i]),
+                delta=float(cycles["delta"][i]),
+                n=int(cycles["n"][i]),
+                reason="",
+                detail="",
+            )
+        )
+    for item in timing.rejected:
+        e_m0 = float(item["E"])
+        t_pri_mjd = float(
+            predicted_time(e_m0, ephem["M0"], ephem["P0"], ephem.get("Pdot", 0.0))
+        )
+        t_pri_jd = float(mjd_to_jd(t_pri_mjd))
+        events.append(
+            dict(
+                E=float(eclipse_number_from_t0(t_pri_jd, t0_jd, period)),
+                E_m0=e_m0,
+                timed=False,
+                reason=item["reason"],
+                detail=item["detail"],
+            )
+        )
+    return sorted(events, key=lambda row: row["E"])
+
+
+def _cycle_geometry(t, y, sig, model, solution, timing, ev, halves) -> dict:
+    """Arrays and labels needed to draw one whole-cycle timing, in MJD.
+
+    Args:
+        t (ndarray): Times (MJD).
+        y (ndarray): Magnitudes.
+        sig (ndarray): Magnitude errors.
+        model (EBModel): Template model.
+        solution (ModelSolution): Solution whose template was used.
+        timing: A ``CycleTimingOutput``.
+        ev (dict): One element of ``_cycle_events``.
+        halves (dict[str, float]): Zoom half-widths in cycles, by eclipse kind.
+
+    Returns:
+        dict: Times, masks, optional template curve, eclipse-band edges and title.
+    """
+    ephem = solution.ephem
+    centre = float(ev["E_m0"]) + 0.25
+    delta = float(ev["delta"]) if ev["timed"] else 0.0
+    th = phase(t, ephem["M0"], ephem["P0"], ephem.get("Pdot", 0.0))
+    pdot = ephem.get("Pdot", 0.0)
+    t_pri_pred = float(predicted_time(ev["E_m0"], ephem["M0"], ephem["P0"], pdot))
+    t_sec_pred = float(predicted_time(ev["E_m0"] + 0.5, ephem["M0"], ephem["P0"], pdot))
+    pl_pri = ephem["P0"] * (1.0 + pdot * ev["E_m0"])
+    pl_sec = ephem["P0"] * (1.0 + pdot * (ev["E_m0"] + 0.5))
+    try:
+        curve = event_curve(
+            t,
+            y,
+            sig,
+            model,
+            solution.p,
+            ephem,
+            centre,
+            delta,
+            0.5,
+            timing.order,
+        )
+        t_grid = curve["t_grid"]
+        y_grid = curve["y_grid"]
+    except ValueError:
+        t_grid = y_grid = None
+    cycle_label = int(np.floor(ev["E"] + 1e-9))
+    if ev["timed"]:
+        title = (
+            f"whole cycle {cycle_label:d}, n={ev['n']}, "
+            f"shift {ev['delta'] * DAY_S:+.1f} s, sigma {ev['sigma'] * DAY_S:.1f} s\n"
+            f"T_primary = {ev['T_primary_mjd']:.6f} MJD, "
+            f"T_secondary = {ev['T_secondary_mjd']:.6f} MJD"
+        )
+    else:
+        title = (
+            f"whole cycle {cycle_label:d}\n"
+            f"NOT TIMED: {ev['reason']} ({ev['detail']})"
+        )
+    return dict(
+        t=t,
+        y=y,
+        cycle=np.abs(th - centre) < 0.5,
+        inside_pri=np.abs(th - ev["E_m0"]) < halves["primary"],
+        inside_sec=np.abs(th - (ev["E_m0"] + 0.5)) < halves["secondary"],
+        t_grid=t_grid,
+        y_grid=y_grid,
+        timed=ev["timed"],
+        t_pri=ev.get("T_primary_mjd"),
+        t_sec=ev.get("T_secondary_mjd"),
+        sigma=ev.get("sigma"),
+        pri_lo=t_pri_pred - halves["primary"] * pl_pri,
+        pri_hi=t_pri_pred + halves["primary"] * pl_pri,
+        sec_lo=t_sec_pred - halves["secondary"] * pl_sec,
+        sec_hi=t_sec_pred + halves["secondary"] * pl_sec,
+        title=title,
+        E=ev["E"],
+    )
+
+
+def _mark_cycle_times(ax, geo) -> None:
+    """Draw vertical lines at the shared-shift primary and secondary times.
+
+    Args:
+        ax (matplotlib.axes.Axes): Target axes.
+        geo (dict): Result of ``_cycle_geometry``.
+    """
+    if not geo["timed"]:
+        return
+    for t_found in (geo["t_pri"], geo["t_sec"]):
+        if t_found is None:
+            continue
+        ax.axvline(t_found, color=LINE_ADOPTED_COLOUR, lw=1.2, zorder=4)
+        ax.axvspan(
+            t_found - geo["sigma"],
+            t_found + geo["sigma"],
+            color=LINE_ADOPTED_COLOUR,
+            alpha=0.25,
+            zorder=1,
+        )
+
+
+def _draw_whole_cycle(ax, geo) -> None:
+    """Draw one orbital cycle of whole-cycle timing, in MJD.
+
+    Args:
+        ax (matplotlib.axes.Axes): Target axes.
+        geo (dict): Result of ``_cycle_geometry``.
+    """
+    t, y, cycle = geo["t"], geo["y"], geo["cycle"]
+    pri = cycle & geo["inside_pri"]
+    sec = cycle & geo["inside_sec"]
+    rest = cycle & ~geo["inside_pri"] & ~geo["inside_sec"]
+    ax.axvspan(
+        geo["pri_lo"], geo["pri_hi"], color=POINT_PRIMARY_COLOUR, alpha=0.12, zorder=0
+    )
+    ax.axvspan(
+        geo["sec_lo"], geo["sec_hi"], color=POINT_SECONDARY_COLOUR, alpha=0.12, zorder=0
+    )
+    ax.scatter(t[rest], y[rest], s=5, color="0.35", zorder=2)
+    if geo["t_grid"] is not None:
+        ax.plot(
+            geo["t_grid"],
+            geo["y_grid"],
+            color=LINE_ADOPTED_COLOUR if geo["timed"] else LINE_SINGLE_COLOUR,
+            lw=LINE_ADOPTED_WIDTH,
+            zorder=5,
+        )
+    if geo["timed"]:
+        ax.scatter(t[pri], y[pri], s=12, color=POINT_PRIMARY_COLOUR, zorder=3)
+        ax.scatter(t[sec], y[sec], s=12, color=POINT_SECONDARY_COLOUR, zorder=3)
+    else:
+        ax.scatter(
+            t[pri | sec],
+            y[pri | sec],
+            s=12,
+            facecolor="none",
+            edgecolor=WINDOW_REJECTED_COLOUR,
+            zorder=3,
+        )
+    _mark_cycle_times(ax, geo)
+    ax.set_title(geo["title"], fontsize=9)
+    ax.set_xlabel("Time (MJD)")
+    ax.set_ylabel("Magnitude")
+    ax.ticklabel_format(axis="x", style="plain", useOffset=False)
+    ax.invert_yaxis()
+
+
+def _draw_cycle_zoom(ax, geo, kind: str) -> None:
+    """Draw one eclipse under the shared whole-cycle shift, in MJD.
+
+    Args:
+        ax (matplotlib.axes.Axes): Target axes.
+        geo (dict): Result of ``_cycle_geometry``.
+        kind (str): ``primary`` or ``secondary``.
+    """
+    t, y = geo["t"], geo["y"]
+    if kind == "primary":
+        lo, hi = geo["pri_lo"], geo["pri_hi"]
+        inside = geo["cycle"] & geo["inside_pri"]
+        colour = POINT_PRIMARY_COLOUR
+        t_found = geo["t_pri"]
+    else:
+        lo, hi = geo["sec_lo"], geo["sec_hi"]
+        inside = geo["cycle"] & geo["inside_sec"]
+        colour = POINT_SECONDARY_COLOUR
+        t_found = geo["t_sec"]
+    if geo["t_grid"] is not None:
+        in_band = (geo["t_grid"] >= lo) & (geo["t_grid"] <= hi)
+        ax.plot(
+            geo["t_grid"][in_band],
+            geo["y_grid"][in_band],
+            color=LINE_ADOPTED_COLOUR if geo["timed"] else LINE_SINGLE_COLOUR,
+            lw=LINE_ADOPTED_WIDTH,
+            zorder=5,
+        )
+    if geo["timed"]:
+        ax.scatter(t[inside], y[inside], s=18, color=colour, zorder=3)
+    else:
+        ax.scatter(
+            t[inside],
+            y[inside],
+            s=18,
+            facecolor="none",
+            edgecolor=WINDOW_REJECTED_COLOUR,
+            zorder=3,
+        )
+    if geo["timed"] and t_found is not None:
+        ax.axvline(t_found, color=LINE_ADOPTED_COLOUR, lw=1.2, zorder=4)
+        ax.axvspan(
+            t_found - geo["sigma"],
+            t_found + geo["sigma"],
+            color=LINE_ADOPTED_COLOUR,
+            alpha=0.25,
+            zorder=1,
+        )
+    ax.set_xlim(lo, hi)
+    ax.set_title(geo["title"], fontsize=9)
+    ax.set_xlabel("Time (MJD)")
+    ax.set_ylabel("Magnitude")
+    ax.ticklabel_format(axis="x", style="plain", useOffset=False)
+    ax.xaxis.set_major_locator(MaxNLocator(nbins=4, prune=None))
+    ax.invert_yaxis()
+
+
+def plot_timing_cycle(t_mjd, mag, sig, solution, timing, E: float, save_path=None):
+    """Draw one orbital cycle of whole-cycle timing (requires matplotlib).
+
+    The x-axis is MJD. Every point used in the cycle fit is drawn; the eclipse
+    bands of 1.5 widths at 5 percent are shaded. The template is at the fitted
+    shift. Red lines mark the primary and secondary times (the same shift).
+
+    Args:
+        t_mjd (ndarray): Times (MJD) that were timed.
+        mag (ndarray): Magnitudes.
+        sig (ndarray): Magnitude errors.
+        solution (ModelSolution): Solution whose template was used.
+        timing: Result of ``mikulasek_eb.time_cycles``.
+        E (float): Cycle number counted from T0, as in the picture name.
+        save_path (str | None): If set, also save the figure here.
+
+    Returns:
+        matplotlib.figure.Figure: The figure.
+
+    Raises:
+        ValueError: If ``timing`` does not belong to ``solution`` or ``E`` is not
+            in the result.
+    """
+    from .descriptors import window_half_widths
+
+    t, y, s = (np.asarray(a, float) for a in (t_mjd, mag, sig))
+    events = _cycle_events(solution, timing)
+    found = [ev for ev in events if ev["E"] == float(E)]
+    if not found:
+        raise ValueError(f"cycle {E} is not in the whole-cycle timing result")
+    halves = window_half_widths(solution, n_widths=1.5, level=0.05)
+    geo = _cycle_geometry(
+        t, y, s, solution.build_model(), solution, timing, found[0], halves
+    )
+    fig, ax = plt.subplots(figsize=(8.5, 4.6))
+    _draw_whole_cycle(ax, geo)
+    fig.tight_layout()
+    if save_path:
+        fig.savefig(save_path, dpi=130)
+    return fig
+
+
+def plot_timing_cycle_zoom(
+    t_mjd, mag, sig, solution, timing, E: float, kind: str, save_path=None
+):
+    """Draw one eclipse under the shared whole-cycle shift (requires matplotlib).
+
+    This is a separate picture, not a second panel of ``plot_timing_cycle``. The
+    zoom is the 1.5-widths-at-5-percent band of that eclipse.
+
+    Args:
+        t_mjd (ndarray): Times (MJD) that were timed.
+        mag (ndarray): Magnitudes.
+        sig (ndarray): Magnitude errors.
+        solution (ModelSolution): Solution whose template was used.
+        timing: Result of ``mikulasek_eb.time_cycles``.
+        E (float): Cycle number counted from T0.
+        kind (str): ``primary`` or ``secondary``.
+        save_path (str | None): If set, also save the figure here.
+
+    Returns:
+        matplotlib.figure.Figure: The figure.
+
+    Raises:
+        ValueError: If the cycle is not in the result or ``kind`` is not an eclipse.
+    """
+    from .descriptors import window_half_widths
+
+    if kind not in ("primary", "secondary"):
+        raise ValueError(f"kind must be primary or secondary, got {kind!r}")
+    t, y, s = (np.asarray(a, float) for a in (t_mjd, mag, sig))
+    events = _cycle_events(solution, timing)
+    found = [ev for ev in events if ev["E"] == float(E)]
+    if not found:
+        raise ValueError(f"cycle {E} is not in the whole-cycle timing result")
+    halves = window_half_widths(solution, n_widths=1.5, level=0.05)
+    geo = _cycle_geometry(
+        t, y, s, solution.build_model(), solution, timing, found[0], halves
+    )
+    fig, ax = plt.subplots(figsize=(5.5, 4.2))
+    _draw_cycle_zoom(ax, geo, kind)
+    fig.tight_layout()
+    if save_path:
+        fig.savefig(save_path, dpi=130)
+    return fig
+
+
+def save_timing_cycles(t_mjd, mag, sig, solution, timing, out_dir, cycles=None) -> list:
+    """Write one whole-cycle picture per orbit, and eclipse zooms in ``out_dir/zoom/``.
+
+    Names follow the window pictures: ``E00.png`` for the orbit, and
+    ``zoom/E00_primary.png``, ``zoom/E00_secondary.png`` for the two eclipses
+    under the same shift. Each file is closed after saving.
+
+    Args:
+        t_mjd (ndarray): Times (MJD) that were timed.
+        mag (ndarray): Magnitudes.
+        sig (ndarray): Magnitude errors.
+        solution (ModelSolution): Solution whose template was used.
+        timing: Result of ``mikulasek_eb.time_cycles``.
+        out_dir (str | Path): Folder for the orbit pictures; created if missing.
+        cycles (iterable of float | None): Cycle numbers E from T0 to draw;
+            None draws all, timed and rejected.
+
+    Returns:
+        list[Path]: The whole-cycle files written.
+
+    Raises:
+        ValueError: If ``timing`` does not belong to ``solution``, a cycle in
+            ``cycles`` is not in the result, or there is nothing to draw.
+    """
+    from .descriptors import window_half_widths
+
+    t, y, s = (np.asarray(a, float) for a in (t_mjd, mag, sig))
+    events = _cycle_events(solution, timing)
+    if cycles is not None:
+        wanted = [float(e) for e in cycles]
+        missing = [e for e in wanted if e not in {ev["E"] for ev in events}]
+        if missing:
+            raise ValueError(f"cycles not in the timing result: {missing}")
+        events = [ev for ev in events if ev["E"] in wanted]
+    if not events:
+        raise ValueError("no cycles to draw")
+    halves = window_half_widths(solution, n_widths=1.5, level=0.05)
+    model = solution.build_model()
+    out_dir = Path(out_dir)
+    zoom_dir = out_dir / "zoom"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    zoom_dir.mkdir(parents=True, exist_ok=True)
+    paths = []
+    for ev in events:
+        geo = _cycle_geometry(t, y, s, model, solution, timing, ev, halves)
+        cycle_label = int(np.floor(ev["E"] + 1e-9))
+        fig, ax = plt.subplots(figsize=(8.5, 4.6))
+        _draw_whole_cycle(ax, geo)
+        fig.tight_layout()
+        path = out_dir / f"E{cycle_label:02d}.png"
+        fig.savefig(path, dpi=130)
+        plt.close(fig)
+        for kind in ("primary", "secondary"):
+            fig, ax = plt.subplots(figsize=(5.5, 4.2))
+            _draw_cycle_zoom(ax, geo, kind)
+            fig.tight_layout()
+            fig.savefig(
+                zoom_dir / f"{eclipse_picture_stem(kind, ev['E'])}.png", dpi=130
+            )
+            plt.close(fig)
+        paths.append(path)
+    return paths

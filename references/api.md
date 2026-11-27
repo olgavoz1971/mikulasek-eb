@@ -18,17 +18,32 @@ Profiles: 1 = A(1+Cx²){1−[1−exp(1−cosh x)]^Γ}; 2 = same without C; 3 = A
 ## descriptors.eclipse_descriptors(source, p=None) -> dict
 Depth and full width at half depth of both fitted eclipses, as properties of the fitted curve and not of its parameters. `source` is a `ModelSolution` (then `p` is ignored) or an `EBModel` with `p`. Returns `{"eclipse_1": {"depth_mag", "fwhm_cycles"}, "eclipse_2": {...}, "depth_ratio", "fwhm_ratio"}` (ratios are eclipse 2 over eclipse 1). Each eclipse is the sum of its profile copies (main profile plus the second component, if any). Harmonics, O'Connell, the other eclipse, the baseline and the exposure integration are excluded. Depth is the deepest point (mag, fainter positive), width is the distance between the half-depth crossings on both sides of that point (linear interpolation on a 2.5e-5 cycle grid). Raises `ValueError` if `p` is missing, if an eclipse has no positive depth, or if it does not fall below half depth within 0.25 cycles. No uncertainties: a solution stores parameter errors but not their covariance.
 
+## descriptors.eclipse_widths(source, p=None, level=0.05) -> dict
+Full width of each fitted eclipse at `level` of its depth, in cycles: `{"primary": w, "secondary": w}`. Same eclipse function as `eclipse_descriptors` (main profile plus second component; no harmonics, O'Connell, other eclipse or exposure), so it needs no contacts and does not depend on the fitted harmonics. `level` must lie strictly between 0 and 1 (profiles such as profile 1 only tend to zero, so a width at 0 is not defined); 0.5 gives the FWHM. Raises `ValueError` for a bad level, a missing `p`, no positive depth, or an eclipse that does not fall below the level within 0.25 cycles.
+
+## descriptors.window_half_widths(source, p=None, n_widths=1.5, level=0.05, max_half=0.25) -> dict
+Half-windows for timing: `half = n_widths * eclipse_widths(...)[kind] / 2`, returned as `{"primary": half, "secondary": half}`. Pass each to `TimingRecipe(window=half)` for that kind. The default of 1.5 widths at 5 percent is preliminary, tested on two synthetic stars only. Nothing is capped or enlarged silently: a half-window above `max_half` raises `ValueError`. The O-C scan is a warning for the researcher, not an input to this function.
+
 ## fit_minimum(t, y, sigma, model, p, ephem, E, window=0.1, order=1, free=(), scan=0.1, rescale=True) -> MinResult
 Points with |ϑ−E| < window. Free: delta [d] (+ multiplicative scales of A, D, G of that eclipse named in `free`). `scan` = initial shift grid half-width in phase. MinResult: `E, T, sigma, delta, n, rchi2, scales`.
 
-## virtual_minima(t, y, sigma, model, p, ephem, window=0.25, order=1, free=(), min_points=10, min_each_side=3) -> dict of arrays (E, T, sigma, delta, n, rchi2)
-All eclipses with enough points on both sides. Call per instrument/filter. window is capped at 0.25.
+## time_cycles(t_mjd, mag, sig, solution, min_points=4, min_each_side=2, order=1) -> CycleTimingOutput
+One shift of the whole template per orbital cycle, a separate method from `time`. Points of cycle n have phase in (n − 0.25, n + 0.75). Default floor: 4 points, 2 on each side of the cycle centre. `cycles` holds E (integer), delta (days), T_primary and T_secondary (absolute JD), sigma, n, rchi2. The same shift is used for both eclipses of the cycle.
+
+## virtual_minima(t, y, sigma, model, p, ephem, window=0.25, order=1, free=(), min_points=4, min_each_side=2) -> dict of arrays (E, T, sigma, delta, n, rchi2, walls_ok)
+All eclipses with enough points on both sides. Default floor 4 points, 2 per side. `walls_ok` is True when both steep walls are sampled; uncovered walls skip the event only if `reject_uncovered_walls=True`. Call per instrument/filter. window is capped at 0.25.
+
+## TimingRecipe defaults
+`min_points=4`, `min_each_side=2`, `require_contact_walls=False`. The wall test is stored as `walls_ok` on each timed minimum of `time`.
 
 ## plotting.save_timing_windows(t_mjd, mag, sig, solution, timing, kind, out_dir, eclipses=None) -> list[Path]
 Writes one picture per eclipse of `kind` timed by `time` (`E01_primary.png`, `E00_secondary.png`): whole-cycle points, fitted window, template at the fitted position, found time and prediction; rejected eclipses with their reason. `plotting.plot_timing_window(..., kind, E)` draws one. Needs matplotlib. Same arrays and solution as passed to `time`. Uses `timing.event_curve(t, y, sigma, model, p, ephem, E, delta, window, order)`, which repeats no fit.
 
 ## plotting.plot_timing_overview(t_mjd, mag, sig, solution, timings, save_path=None) -> Figure
 Folded light curve over two cycles with the primary and secondary timing windows in one picture.
+
+## plotting.save_timing_cycles(t_mjd, mag, sig, solution, timing, out_dir, cycles=None) -> list[Path]
+Writes one picture per orbit timed by `time_cycles` (`E00.png`): all points used in that cycle, template at the fitted shift, primary and secondary times (the same shift). Zooms of each eclipse under that shift go in `out_dir/zoom/` as `E00_primary.png` and `E00_secondary.png`; the zoom band is 1.5 widths at 5 percent of depth. `plot_timing_cycle(..., E)` and `plot_timing_cycle_zoom(..., E, kind)` draw one. Cycle `E` is counted from T0. Needs matplotlib. Same arrays and solution as passed to `time_cycles`.
 
 ## fit_ephemeris(T, sigma, E, deg=2) -> (coefficients, residuals, weighted rms)
 Weighted polynomial T(E).

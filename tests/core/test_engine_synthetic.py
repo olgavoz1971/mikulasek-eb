@@ -134,7 +134,9 @@ def test_virtual_minima_min_points_is_a_parameter():
     t, mag, sig = t[keep], mag[keep], sig[keep]
     ephem = dict(M0=M0_D, P0=PERIOD_D)
     rejected: list = []
-    none = virtual_minima(t, mag, sig, model, TRUE_PARAMS, ephem, rejected=rejected)
+    none = virtual_minima(
+        t, mag, sig, model, TRUE_PARAMS, ephem, min_points=10, rejected=rejected
+    )
     assert len(none["T"]) == 0
     assert {r["reason"] for r in rejected} == {"too_few_points"}
     some = virtual_minima(
@@ -153,3 +155,36 @@ def test_virtual_minima_overlapping_window_is_opt_in():
     )
     assert np.max(capped["n"]) < np.min(wide["n"]) * 0.75
     assert np.median(wide["sigma"]) < np.median(capped["sigma"])
+
+
+def test_virtual_minima_flags_walls_without_rejecting():
+    """Uncovered walls are recorded as ``walls_ok`` and still timed by default."""
+    from mikulasek_eb.tuning import wall_band
+
+    t, mag, sig, model = _make_lightcurve()
+    ephem = dict(M0=M0_D, P0=PERIOD_D)
+    wb = wall_band(model, TRUE_PARAMS)
+    vm = virtual_minima(
+        t, mag, sig, model, TRUE_PARAMS, ephem, wall_band=wb, reject_uncovered_walls=False
+    )
+    assert "walls_ok" in vm
+    assert len(vm["walls_ok"]) == len(vm["T"])
+    assert vm["walls_ok"].dtype == bool
+    assert "n_before" in vm and "n_after" in vm and "balanced" in vm
+    assert len(vm["balanced"]) == len(vm["T"])
+    assert vm["balanced"].dtype == bool
+    refused: list = []
+    skipped = virtual_minima(
+        t,
+        mag,
+        sig,
+        model,
+        TRUE_PARAMS,
+        ephem,
+        wall_band=wb,
+        reject_uncovered_walls=True,
+        rejected=refused,
+    )
+    assert len(skipped["T"]) <= len(vm["T"])
+    if refused:
+        assert {row["reason"] for row in refused} <= {"walls_uncovered", "too_few_points", "one_side_uncovered", "fit_failed"}
